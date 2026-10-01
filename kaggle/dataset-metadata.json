@@ -1,0 +1,7 @@
+{
+  "title": "finetune-vs-api-sft",
+  "id": "ameypawar123456789/finetune-vs-api-sft",
+  "subtitle": "MASSIVE 1.1 en-US as OpenAI chat-format SFT records",
+  "description": "sft_train.jsonl and sft_dev.jsonl: the train and dev splits of MASSIVE 1.1 (en-US) as OpenAI chat-format records ({\"messages\": [system, user, assistant]}), where the assistant turn is the labelled JSON function call. Derived from MASSIVE (Amazon, CC BY 4.0), whose English text comes from SLURP (CC BY 4.0). Change made: the [label : value] slot annotations were converted to JSON. Attribution and citations: NOTICE.md in the finetune-vs-api repository. Licence: CC BY 4.0, given as 'other' because it is stated here rather than chosen from Kaggle's list. Prepared by scripts/prepare_data.py. The test split is not included.",
+  "licenses": [{"name": "other"}]
+}

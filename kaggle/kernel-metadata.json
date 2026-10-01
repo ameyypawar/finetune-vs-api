@@ -1,0 +1,14 @@
+{
+  "id": "ameypawar123456789/finetune-vs-api-train",
+  "title": "finetune-vs-api-train",
+  "code_file": "train_on_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": ["ameypawar123456789/finetune-vs-api-sft"],
+  "competition_sources": [],
+  "kernel_sources": []
+}
