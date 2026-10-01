@@ -1,0 +1,43 @@
+# LoRA fine-tune of the base model on MASSIVE's human-labelled train split.
+#
+# Training runs on a Kaggle GPU, not here: kaggle/train_on_kaggle.py holds a copy of these
+# values and tests/test_kaggle_files.py fails if the two drift apart. Labels come from the
+# train split only, never from any API model's output.
+
+base_model:
+  name: Qwen/Qwen3-4B-Instruct-2507
+  license: Apache-2.0
+  # Placeholder: pin the Hugging Face commit hash before the first run, so the adapter can
+  # be traced to exactly the weights it was trained on. The Kaggle script refuses to run
+  # while this is null.
+  revision: null
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.0
+  target_modules: all-linear # PEFT's keyword
+  # Unsloth takes an explicit list; for Qwen3 "all linear layers" is these seven projections.
+  target_modules_expanded:
+    [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  bias: none
+
+training:
+  learning_rate: 2.0e-4
+  num_train_epochs: 2
+  save_each_epoch: true # one adapter per epoch, so the epoch can be picked on dev
+  effective_batch_size: 16
+  per_device_train_batch_size: 8
+  gradient_accumulation_steps: 2 # 8 x 2 = 16
+  max_seq_length: 512
+  seed: 3407
+  # Not set by the plan; Unsloth's usual defaults for a LoRA run of this size.
+  lr_scheduler_type: linear
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  optim: adamw_8bit
+  load_in_4bit: true # the base is quantized to fit a 16 GB T4 (QLoRA)
+
+data:
+  train_file: sft_train.jsonl
+  eval_file: sft_dev.jsonl

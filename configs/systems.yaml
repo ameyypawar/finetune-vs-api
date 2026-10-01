@@ -1,0 +1,144 @@
+# The systems compared, one row each.
+#
+# A system is an endpoint (where requests go), a model, a prompt and decoding parameters.
+# The test lock (scripts/lock_test.py) covers one system at a time, so API rows can be locked
+# and run before the fine-tuned model exists.
+#
+# What is hashed into a system's lock: its prompt as rendered, the output schema, endpoint
+# identity, model, prompt name, max_input_tokens, decoding (params, drop_params,
+# supports_json_schema, reasoning_in_completion), the chosen checkpoint, the price entry in
+# configs/sources.yaml, and the pinned dataset. Rate limits and concurrency are NOT hashed:
+# they change how fast a run goes, not what it measures.
+
+schema_version: 1
+
+# --- endpoints: where requests go -------------------------------------------------------------
+endpoints:
+  # A local OpenAI-compatible server (for example vLLM) serving the base model and the adapter.
+  local:
+    base_url: http://127.0.0.1:8000/v1
+    api_key_env: null
+    # true: send the strict JSON schema as response_format. false: do not, and measure how
+    # often the model produces valid JSON on its own. Local rows keep this false so the
+    # schema-valid rate reflects the fine-tune, not constrained decoding.
+    supports_json_schema: false
+    # true: the provider's completion_tokens already include reasoning tokens (OpenAI style).
+    reasoning_in_completion: true
+
+  github-models:
+    base_url: https://models.github.ai/inference # to be confirmed on day 1
+    catalog_url: https://models.github.ai/catalog/models # to be confirmed on day 1
+    api_key_env: GITHUB_MODELS_TOKEN
+    supports_json_schema: false # flip to true if check_free_tiers reports the strict schema accepted
+    reasoning_in_completion: true
+
+  groq:
+    base_url: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+    supports_json_schema: false # flip to true if check_free_tiers reports the strict schema accepted
+    reasoning_in_completion: true
+
+# --- systems -----------------------------------------------------------------------------------
+# Row keys
+#   endpoint        key into `endpoints`
+#   model           the model id sent in each request
+#   prompt          prompt used on the test split (see src/finetune_vs_api/prompts.py)
+#   dev_prompts     extra prompts allowed on the dev split only
+#   test_subset     default --subset for --split test (full, S500 or S300)
+#   price_id        entry in sources.yaml `prices`, or null when there is no API price
+#   checkpoint      what was served: every value must be set before the system can be locked
+#   params          sent with every request
+#   drop_params     names removed from the request for an endpoint that rejects them
+#   limits          rpm / rpd (requests), tpm / tpd (tokens), max_concurrency,
+#                   max_input_tokens (a request estimated above it is not sent),
+#                   max_output_tokens (documented cap; params must stay within it)
+systems:
+  ft-qwen3-4b-lora:
+    endpoint: local
+    model: ft-qwen3-4b-lora
+    prompt: finetuned_v1
+    test_subset: full
+    price_id: null
+    checkpoint:
+      adapter: null # path or repo of the chosen adapter
+      epoch: null # which saved epoch won on dev
+      base_revision: null # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507
+    params:
+      temperature: 0
+      max_tokens: 256
+    drop_params: []
+    limits:
+      max_concurrency: 8
+
+  base-qwen3-4b-k10:
+    endpoint: local
+    model: Qwen/Qwen3-4B-Instruct-2507
+    prompt: fewshot_k10_v1
+    test_subset: full
+    price_id: null
+    checkpoint:
+      base_revision: null
+    params:
+      temperature: 0
+      max_tokens: 256
+    drop_params: []
+    limits:
+      max_concurrency: 8
+
+  gh-gpt-4.1-mini-k10:
+    endpoint: github-models
+    model: openai/gpt-4.1-mini
+    tier: low
+    prompt: fewshot_k10_v1
+    dev_prompts: [zeroshot_v1]
+    test_subset: S500
+    price_id: openai-gpt-4.1-mini
+    params:
+      temperature: 0
+      max_tokens: 256
+    drop_params: []
+    limits:
+      rpm: 15
+      rpd: 150
+      max_concurrency: 2
+      max_input_tokens: 8000
+      max_output_tokens: 4000
+
+  gh-gpt-4.1-k10:
+    endpoint: github-models
+    model: openai/gpt-4.1
+    tier: high
+    prompt: fewshot_k10_v1
+    dev_prompts: [zeroshot_v1]
+    test_subset: S300
+    price_id: openai-gpt-4.1
+    params:
+      temperature: 0
+      max_tokens: 256
+    drop_params: []
+    limits:
+      rpm: 10
+      rpd: 50
+      max_concurrency: 2
+      max_input_tokens: 8000
+      max_output_tokens: 4000
+
+  groq-gpt-oss-120b-k10:
+    endpoint: groq
+    model: openai/gpt-oss-120b
+    prompt: fewshot_k10_v1
+    dev_prompts: [zeroshot_v1]
+    test_subset: S500
+    price_id: groq-gpt-oss-120b
+    params:
+      temperature: 0
+      reasoning_effort: low
+      # A reasoning model: the budget covers reasoning tokens as well as the JSON answer, and
+      # both count against the token limits below.
+      max_completion_tokens: 1024
+    drop_params: []
+    limits:
+      rpm: 30
+      rpd: 1000
+      tpm: 8000
+      tpd: 200000

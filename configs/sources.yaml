@@ -1,0 +1,118 @@
+# Prices, limits and dates, and where each one came from.
+#
+# Every entry carries the URL it was read from and the date it was retrieved. Nothing in
+# the code hard-codes a price: costs are computed from `prices`, and the entry that was used
+# (URL and date included) is copied into every run summary. The test lock hashes the entry
+# a system uses, so changing a price after locking is caught.
+#
+# These values were transcribed from the project plan. The OpenAI deprecation dates were
+# cross-checked against a saved copy of the page named below; the prices and free-tier limits
+# were not re-checked against their pages. Re-read a page and update `retrieved_on` before
+# relying on a number.
+#
+# The API systems run on free tiers, so no money is spent: every cost is what the same calls
+# would cost at the paid list price below (see billing_basis).
+
+schema_version: 1
+billing_basis: "free tier; priced at paid list price"
+
+# --- list prices, USD per 1M tokens ----------------------------------------------------------
+prices:
+  openai-gpt-4.1-mini:
+    provider: openai
+    model: gpt-4.1-mini
+    url: https://developers.openai.com/api/docs/pricing
+    retrieved_on: "2026-10-01"
+    usd_per_mtok:
+      input: 0.40
+      cached_input: 0.10
+      output: 1.60
+
+  openai-gpt-4.1:
+    provider: openai
+    model: gpt-4.1
+    url: https://developers.openai.com/api/docs/pricing
+    retrieved_on: "2026-10-01"
+    usd_per_mtok:
+      input: 2.00
+      cached_input: 0.50
+      output: 8.00
+
+  groq-gpt-oss-120b:
+    provider: groq
+    model: openai/gpt-oss-120b
+    url: https://console.groq.com/docs/model/openai/gpt-oss-120b
+    retrieved_on: "2026-10-01"
+    usd_per_mtok:
+      input: 0.15
+      cached_input: 0.075
+      output: 0.60
+
+# --- free-tier limits, as published ----------------------------------------------------------
+# `observed` stays empty until scripts/check_free_tiers.py has run against the real endpoint.
+free_tier_limits:
+  github-models:
+    url: https://docs.github.com/en/enterprise-cloud@latest/github-models/use-github-models/prototyping-with-ai-models
+    retrieved_on: "2026-10-01"
+    tiers:
+      low:
+        requests_per_minute: 15
+        requests_per_day: 150
+        concurrent_requests: 2
+        max_input_tokens: 8000
+        max_output_tokens: 4000
+      high:
+        requests_per_minute: 10
+        requests_per_day: 50
+        concurrent_requests: 2
+        max_input_tokens: 8000
+        max_output_tokens: 4000
+    observed:
+      checked_on: null
+      models: null
+
+  groq:
+    url: https://console.groq.com/docs/rate-limits
+    retrieved_on: "2026-10-01"
+    models:
+      openai/gpt-oss-120b:
+        requests_per_minute: 30
+        requests_per_day: 1000
+        tokens_per_minute: 8000
+        tokens_per_day: 200000
+    observed:
+      checked_on: null
+      models: null
+
+# --- GPU rental, USD per hour -----------------------------------------------------------------
+gpu_rental:
+  aws-g4dn.xlarge:
+    gpu: "1x NVIDIA T4"
+    url: https://instances.vantage.sh/aws/ec2/g4dn.xlarge
+    retrieved_on: "2026-10-01"
+    usd_per_hour:
+      on_demand: 0.526
+      spot: 0.274
+
+# --- OpenAI fine-tuning and evals deprecations --------------------------------------------------
+# Context for why this comparison is published when it is.
+openai_deprecations:
+  url: https://developers.openai.com/api/docs/deprecations
+  retrieved_on: "2026-10-01"
+  events:
+    - date: "2026-10-23"
+      relation: "on"
+      what: >-
+        Fine-tuned models shut down: ft-gpt-3.5-turbo, ft-gpt-4, ft-gpt-4.1-nano-2025-04-14,
+        ft-babbage-002, ft-davinci-002 and ft-o4-mini-2025-04-16.
+    - date: "2026-10-31"
+      relation: "from"
+      what: Evals become read-only.
+    - date: "2026-11-30"
+      relation: "on"
+      what: Evals shut down.
+    - date: "2027-01-06"
+      relation: "from"
+      what: >-
+        Active existing customers can no longer create new fine-tuning jobs. Inference on
+        existing fine-tuned models continues until their base model is deprecated.
