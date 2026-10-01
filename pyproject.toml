@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finetune-vs-api"
+version = "0.1.0"
+description = "A LoRA fine-tune of a small open model compared with API models on one narrow task: turning a request into a JSON function call."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "MIT" }
+
+# Exact pins live in requirements.txt. These are the loose runtime bounds for an
+# editable install. Nothing here needs a GPU: training runs on Kaggle (see kaggle/).
+dependencies = [
+    "numpy>=2.0",
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+    "fastembed>=0.7",
+    "tiktoken>=0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "kaggle>=2.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "scripts", "kaggle"]
+extend-exclude = ["data", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# E501: long lines are left to the author; prompts and URLs do not wrap well.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts put src/ on sys.path before importing the package, so they run without an
+# editable install (same convention as the other projects here).
+"scripts/*" = ["E402"]

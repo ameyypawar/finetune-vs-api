@@ -1,0 +1,30 @@
+# Anchored with a leading slash on purpose: an unanchored `data/` would also match
+# any package directory that happens to be called data.
+/data/
+
+# Secrets
+.env
+
+# Environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.DS_Store
+
+# Model weights, adapters and checkpoints never live in this repository. The
+# adapter is released separately, with its licence notice (see NOTICE.md).
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+/adapters/
+/checkpoints/
+/outputs/

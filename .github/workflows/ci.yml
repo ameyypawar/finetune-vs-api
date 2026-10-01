@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      # Python 3.11 only (pyproject.toml pins >=3.11,<3.12). The tests are self-contained: CI
+      # needs no dataset, no GPU, no model download and no API key. Tests that use the real
+      # data or the embedding model skip themselves when those are absent.
+      - name: Create the environment
+        run: |
+          uv venv --python 3.11
+          uv pip install -r requirements.txt
+          uv pip install -e . --no-deps
+
+      - name: Tests
+        run: .venv/bin/pytest -q
+
+      - name: Lint
+        run: .venv/bin/ruff check .
