@@ -1,0 +1,514 @@
+{
+  "dataset": {
+    "name": "MASSIVE",
+    "version": "1.1",
+    "locale": "en-US",
+    "license": "CC-BY-4.0",
+    "url": "https://amazon-massive-nlu-dataset.s3.amazonaws.com/amazon-massive-dataset-1.1.tar.gz",
+    "archive_sha256": "4cba5faa11c71437928e17cb1b9b3d8b8e727e7ea363a3a9a8045e19c0491577"
+  },
+  "splits": {
+    "train": 11514,
+    "dev": 2033,
+    "test": 2974,
+    "total": 16521
+  },
+  "labels": {
+    "intents": {
+      "n_total": 60,
+      "per_split": {
+        "train": 60,
+        "dev": 59,
+        "test": 59
+      },
+      "missing_from_split": {
+        "train": [],
+        "dev": [
+          "audio_volume_other"
+        ],
+        "test": [
+          "cooking_query"
+        ]
+      },
+      "not_in_train": {
+        "dev": [],
+        "test": []
+      }
+    },
+    "slot_types": {
+      "n_total": 55,
+      "per_split": {
+        "train": 55,
+        "dev": 53,
+        "test": 53
+      },
+      "missing_from_split": {
+        "train": [],
+        "dev": [
+          "music_album",
+          "transport_descriptor"
+        ],
+        "test": [
+          "game_type",
+          "sport_type"
+        ]
+      },
+      "not_in_train": {
+        "dev": [],
+        "test": []
+      }
+    }
+  },
+  "scenarios": {
+    "n_total": 18,
+    "per_split": {
+      "train": {
+        "alarm": 390,
+        "audio": 290,
+        "calendar": 1688,
+        "cooking": 211,
+        "datetime": 402,
+        "email": 953,
+        "general": 652,
+        "iot": 769,
+        "lists": 539,
+        "music": 332,
+        "news": 503,
+        "play": 1377,
+        "qa": 1183,
+        "recommendation": 433,
+        "social": 391,
+        "takeaway": 257,
+        "transport": 571,
+        "weather": 573
+      },
+      "dev": {
+        "alarm": 64,
+        "audio": 35,
+        "calendar": 280,
+        "cooking": 43,
+        "datetime": 73,
+        "email": 157,
+        "general": 122,
+        "iot": 118,
+        "lists": 112,
+        "music": 56,
+        "news": 82,
+        "play": 260,
+        "qa": 214,
+        "recommendation": 69,
+        "social": 68,
+        "takeaway": 44,
+        "transport": 110,
+        "weather": 126
+      },
+      "test": {
+        "alarm": 96,
+        "audio": 62,
+        "calendar": 402,
+        "cooking": 72,
+        "datetime": 103,
+        "email": 271,
+        "general": 189,
+        "iot": 220,
+        "lists": 142,
+        "music": 81,
+        "news": 124,
+        "play": 387,
+        "qa": 288,
+        "recommendation": 94,
+        "social": 106,
+        "takeaway": 57,
+        "transport": 124,
+        "weather": 156
+      }
+    }
+  },
+  "slots": {
+    "total": 16171,
+    "examples_without_slots": {
+      "train": 3755,
+      "dev": 646,
+      "test": 994
+    },
+    "max_per_example": 7,
+    "values_not_found_in_text": 0
+  },
+  "duplicates_within_train": {
+    "normalization": "lowercase, trim, collapse whitespace",
+    "duplicate_text_groups": 46,
+    "rows_in_groups": 92,
+    "groups_with_identical_label": 41,
+    "groups_with_conflicting_intent": 4,
+    "groups_with_same_intent_different_slots": 1,
+    "first_groups": [
+      {
+        "text": "what's playing",
+        "ids": [
+          "116",
+          "136"
+        ],
+        "intents": [
+          "music_query"
+        ]
+      },
+      {
+        "text": "play my favorite playlist",
+        "ids": [
+          "141",
+          "3190"
+        ],
+        "intents": [
+          "play_music"
+        ]
+      },
+      {
+        "text": "what's the time",
+        "ids": [
+          "270",
+          "519"
+        ],
+        "intents": [
+          "datetime_query"
+        ]
+      },
+      {
+        "text": "what's a silly joke you know",
+        "ids": [
+          "492",
+          "493"
+        ],
+        "intents": [
+          "general_joke"
+        ]
+      },
+      {
+        "text": "change the light color to blue",
+        "ids": [
+          "496",
+          "4825"
+        ],
+        "intents": [
+          "iot_hue_lightchange"
+        ]
+      },
+      {
+        "text": "food order from grubhub",
+        "ids": [
+          "877",
+          "878"
+        ],
+        "intents": [
+          "takeaway_order"
+        ]
+      },
+      {
+        "text": "play irene from tobymac",
+        "ids": [
+          "993",
+          "994"
+        ],
+        "intents": [
+          "play_music"
+        ]
+      },
+      {
+        "text": "what's the time now",
+        "ids": [
+          "1854",
+          "4220"
+        ],
+        "intents": [
+          "datetime_query"
+        ]
+      },
+      {
+        "text": "good night",
+        "ids": [
+          "2004",
+          "3594"
+        ],
+        "intents": [
+          "audio_volume_mute",
+          "iot_hue_lightoff"
+        ]
+      },
+      {
+        "text": "what's the date today",
+        "ids": [
+          "2183",
+          "2409"
+        ],
+        "intents": [
+          "datetime_query"
+        ]
+      }
+    ]
+  },
+  "overlap": {
+    "normalization": "lowercase, trim, collapse whitespace",
+    "train_dev": {
+      "shared_texts": 11,
+      "train_items": 11,
+      "dev_items": 11
+    },
+    "train_test": {
+      "shared_texts": 21,
+      "train_items": 22,
+      "test_items": 21
+    },
+    "dev_test": {
+      "shared_texts": 5,
+      "dev_items": 5,
+      "test_items": 5
+    },
+    "dev_item_ids_in_train": [
+      "58",
+      "188",
+      "392",
+      "2943",
+      "5290",
+      "6425",
+      "6570",
+      "10784",
+      "13875",
+      "14203",
+      "15421"
+    ],
+    "dev_items_with_identical_label_in_train": 10,
+    "test_item_ids_in_train": [
+      "3",
+      "1513",
+      "2322",
+      "2870",
+      "4171",
+      "4232",
+      "4377",
+      "4567",
+      "6241",
+      "6729",
+      "7878",
+      "8044",
+      "10442",
+      "12008",
+      "13580",
+      "14406",
+      "15409",
+      "15647",
+      "16002",
+      "16624",
+      "16712"
+    ],
+    "test_items_with_identical_label_in_train": 18,
+    "ignoring_punctuation": {
+      "train_dev": {
+        "shared_texts": 18,
+        "train_items": 18,
+        "dev_items": 19
+      },
+      "train_test": {
+        "shared_texts": 31,
+        "train_items": 32,
+        "test_items": 31
+      },
+      "dev_test": {
+        "shared_texts": 6,
+        "dev_items": 6,
+        "test_items": 6
+      },
+      "dev_item_ids_in_train": [
+        "58",
+        "188",
+        "346",
+        "392",
+        "1687",
+        "1688",
+        "2553",
+        "2943",
+        "4623",
+        "5290",
+        "5788",
+        "6425",
+        "6570",
+        "10361",
+        "10415",
+        "10784",
+        "13875",
+        "14203",
+        "15421"
+      ],
+      "dev_items_with_identical_label_in_train": 13,
+      "test_item_ids_in_train": [
+        "3",
+        "102",
+        "1513",
+        "1684",
+        "2322",
+        "2870",
+        "4171",
+        "4232",
+        "4266",
+        "4377",
+        "4567",
+        "5721",
+        "6241",
+        "6729",
+        "7878",
+        "8044",
+        "8251",
+        "8290",
+        "10323",
+        "10442",
+        "10455",
+        "12008",
+        "13580",
+        "14406",
+        "15409",
+        "15647",
+        "15845",
+        "16002",
+        "16624",
+        "16712",
+        "16989"
+      ],
+      "test_items_with_identical_label_in_train": 21
+    }
+  },
+  "expected": {
+    "values": {
+      "train": 11514,
+      "dev": 2033,
+      "test": 2974,
+      "intents": 60,
+      "slot_types": 55
+    },
+    "matches": true,
+    "differences": []
+  },
+  "integrity": {
+    "markup_text_differs_from_utt": 0,
+    "empty_value_slots_dropped": 0,
+    "slot_values_not_found_in_text": 0
+  },
+  "inventory": {
+    "intents": [
+      "alarm_query",
+      "alarm_remove",
+      "alarm_set",
+      "audio_volume_down",
+      "audio_volume_mute",
+      "audio_volume_other",
+      "audio_volume_up",
+      "calendar_query",
+      "calendar_remove",
+      "calendar_set",
+      "cooking_query",
+      "cooking_recipe",
+      "datetime_convert",
+      "datetime_query",
+      "email_addcontact",
+      "email_query",
+      "email_querycontact",
+      "email_sendemail",
+      "general_greet",
+      "general_joke",
+      "general_quirky",
+      "iot_cleaning",
+      "iot_coffee",
+      "iot_hue_lightchange",
+      "iot_hue_lightdim",
+      "iot_hue_lightoff",
+      "iot_hue_lighton",
+      "iot_hue_lightup",
+      "iot_wemo_off",
+      "iot_wemo_on",
+      "lists_createoradd",
+      "lists_query",
+      "lists_remove",
+      "music_dislikeness",
+      "music_likeness",
+      "music_query",
+      "music_settings",
+      "news_query",
+      "play_audiobook",
+      "play_game",
+      "play_music",
+      "play_podcasts",
+      "play_radio",
+      "qa_currency",
+      "qa_definition",
+      "qa_factoid",
+      "qa_maths",
+      "qa_stock",
+      "recommendation_events",
+      "recommendation_locations",
+      "recommendation_movies",
+      "social_post",
+      "social_query",
+      "takeaway_order",
+      "takeaway_query",
+      "transport_query",
+      "transport_taxi",
+      "transport_ticket",
+      "transport_traffic",
+      "weather_query"
+    ],
+    "slot_types": [
+      "alarm_type",
+      "app_name",
+      "artist_name",
+      "audiobook_author",
+      "audiobook_name",
+      "business_name",
+      "business_type",
+      "change_amount",
+      "coffee_type",
+      "color_type",
+      "cooking_type",
+      "currency_name",
+      "date",
+      "definition_word",
+      "device_type",
+      "drink_type",
+      "email_address",
+      "email_folder",
+      "event_name",
+      "food_type",
+      "game_name",
+      "game_type",
+      "general_frequency",
+      "house_place",
+      "ingredient",
+      "joke_type",
+      "list_name",
+      "meal_type",
+      "media_type",
+      "movie_name",
+      "movie_type",
+      "music_album",
+      "music_descriptor",
+      "music_genre",
+      "news_topic",
+      "order_type",
+      "person",
+      "personal_info",
+      "place_name",
+      "player_setting",
+      "playlist_name",
+      "podcast_descriptor",
+      "podcast_name",
+      "radio_name",
+      "relation",
+      "song_name",
+      "sport_type",
+      "time",
+      "time_zone",
+      "timeofday",
+      "transport_agency",
+      "transport_descriptor",
+      "transport_name",
+      "transport_type",
+      "weather_descriptor"
+    ]
+  }
+}
