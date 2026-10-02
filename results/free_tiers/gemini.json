@@ -1,0 +1,99 @@
+{
+  "endpoint": "gemini",
+  "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+  "checked_at": "2026-10-02T08:35:14Z",
+  "models": {
+    "gemini-3.8-flash": {
+      "model_requested": "gemini-3.8-flash",
+      "tier": null,
+      "checked_at": "2026-10-02T08:22:12Z",
+      "probe": {
+        "prompt": "zeroshot_v1",
+        "request": "wake me up at five am this week"
+      },
+      "strict_json_schema_accepted": true,
+      "attempts": [
+        {
+          "kind": "strict_json_schema",
+          "sent_at": "2026-10-02T08:22:12Z",
+          "status": 200,
+          "error": null,
+          "model_returned": "gemini-3.8-flash",
+          "finish_reason": "stop",
+          "latency_s": 6.6642,
+          "ratelimit_headers": {},
+          "answer_preview": "{\"intent\": \"alarm_set\", \"slots\": [{\"type\": \"time\", \"value\": \"five am\"}, {\"type\": \"date\", \"value\": \"this week\"}]}",
+          "answer_valid_for_schema": true,
+          "usage_reported": true,
+          "usage_fields_present": [
+            "prompt_tokens",
+            "completion_tokens"
+          ],
+          "usage": {
+            "prompt_tokens": 681,
+            "completion_tokens": 38,
+            "cached_tokens": null,
+            "reasoning_tokens": null,
+            "reported": true,
+            "estimated": false,
+            "estimate_method": null
+          }
+        }
+      ],
+      "answered": true,
+      "model_returned": "gemini-3.8-flash",
+      "usage_reported": true,
+      "usage_fields_present": [
+        "prompt_tokens",
+        "completion_tokens"
+      ],
+      "ratelimit_headers": {}
+    },
+    "gemini-3.5-flash-lite": {
+      "model_requested": "gemini-3.5-flash-lite",
+      "tier": null,
+      "checked_at": "2026-10-02T08:35:14Z",
+      "probe": {
+        "prompt": "zeroshot_v1",
+        "request": "wake me up at five am this week"
+      },
+      "strict_json_schema_accepted": true,
+      "attempts": [
+        {
+          "kind": "strict_json_schema",
+          "sent_at": "2026-10-02T08:35:14Z",
+          "status": 200,
+          "error": null,
+          "model_returned": "gemini-3.5-flash-lite",
+          "finish_reason": "stop",
+          "latency_s": 1.4311,
+          "ratelimit_headers": {},
+          "answer_preview": "{\n  \"intent\": \"alarm_set\",\n  \"slots\": [\n    {\n      \"type\": \"time\",\n      \"value\": \"five am\"\n    },\n    {\n      \"type\": \"date\",\n      \"value\": \"this week\"\n    }\n  ]\n}",
+          "answer_valid_for_schema": true,
+          "usage_reported": true,
+          "usage_fields_present": [
+            "prompt_tokens",
+            "completion_tokens"
+          ],
+          "usage": {
+            "prompt_tokens": 681,
+            "completion_tokens": 68,
+            "cached_tokens": null,
+            "reasoning_tokens": null,
+            "reported": true,
+            "estimated": false,
+            "estimate_method": null
+          }
+        }
+      ],
+      "answered": true,
+      "model_returned": "gemini-3.5-flash-lite",
+      "usage_reported": true,
+      "usage_fields_present": [
+        "prompt_tokens",
+        "completion_tokens"
+      ],
+      "ratelimit_headers": {}
+    }
+  }
+}

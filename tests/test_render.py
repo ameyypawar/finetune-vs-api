@@ -344,7 +344,7 @@ def test_templates_type_no_numbers(name):
 def test_the_number_check_would_catch_a_typed_number():
     assert STANDALONE_NUMBER.findall(prose_of("score of 91% on 500 items {{ ok }}")) == ["91%", "500"]
     assert NUMBER_WORDS.findall(prose_of("the ten most similar")) == ["ten"]
-    assert STANDALONE_NUMBER.findall(prose_of("S500, p95, qwen3.8-27b, gemini-3.8-flash and `0.5` are names; per 1,000 calls is the unit")) == []
+    assert STANDALONE_NUMBER.findall(prose_of("S500, p95, qwen3.8-27b, gemini-3.5-flash-lite and `0.5` are names; per 1,000 calls is the unit")) == []
 
 
 def test_the_rendered_numbers_are_the_ones_in_the_comparison(standard, tmp_path):
@@ -613,7 +613,7 @@ def test_the_setup_lists_every_system_and_where_it_runs(tmp_path):
         f"- `groq-gpt-oss-20b-k10`: openai/gpt-oss-20b, {fewshot}, Groq, free tier.",
         f"- `groq-gpt-oss-120b-k10`: openai/gpt-oss-120b, {fewshot}, Groq, free tier.",
         f"- `groq-qwen3.8-27b-k10`: qwen/qwen3.8-27b, {fewshot}, Groq, free tier.",
-        f"- `gemini-3.8-flash-k10`: gemini-3.8-flash, {fewshot}, Google AI Studio, free tier.",
+        f"- `gemini-3.5-flash-lite-k10`: gemini-3.5-flash-lite, {fewshot}, Google AI Studio, free tier.",
     ]
     assert "GitHub" not in "\n".join(lines)
 

@@ -28,7 +28,7 @@ BASE = "base-qwen3-4b-k10"
 GPT_OSS_20B = "groq-gpt-oss-20b-k10"
 GPT_OSS_120B = "groq-gpt-oss-120b-k10"
 QWEN_27B = "groq-qwen3.8-27b-k10"
-GEMINI = "gemini-3.8-flash-k10"
+GEMINI = "gemini-3.5-flash-lite-k10"
 API_SYSTEMS = (GPT_OSS_20B, GPT_OSS_120B, QWEN_27B, GEMINI)
 SYSTEMS = (FT, BASE, *API_SYSTEMS)  # the order of configs/systems.yaml
 
@@ -40,7 +40,7 @@ ROUND_PRICES = {
     "groq-gpt-oss-20b": {"input": 1.0, "cached_input": 0.25, "output": 2.0},
     "groq-gpt-oss-120b": {"input": 0.5, "cached_input": 0.25, "output": 1.0},
     "groq-qwen3.8-27b": {"input": 2.0, "output": 4.0},
-    "google-gemini-3.8-flash": {"input": 1.0, "cached_input": 0.5, "output": 4.0},
+    "google-gemini-3.5-flash-lite": {"input": 1.0, "cached_input": 0.5, "output": 4.0},
 }
 GPU_ON_DEMAND = 0.5  # USD per hour
 USAGE = (1000, 100)  # prompt tokens, completion tokens per call

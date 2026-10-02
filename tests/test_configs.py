@@ -18,7 +18,7 @@ SYSTEMS = yaml.safe_load((ROOT / "configs" / "systems.yaml").read_text())
 
 LOCAL_ROWS = ["ft-qwen3-4b-lora", "base-qwen3-4b-k10"]
 GROQ_ROWS = ["groq-gpt-oss-20b-k10", "groq-gpt-oss-120b-k10", "groq-qwen3.8-27b-k10"]
-GEMINI_ROW = "gemini-3.8-flash-k10"
+GEMINI_ROW = "gemini-3.5-flash-lite-k10"
 API_ROWS = [*GROQ_ROWS, GEMINI_ROW]
 
 
@@ -67,12 +67,13 @@ def test_the_gemini_row():
     row = spec(GEMINI_ROW)
     assert row["base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai"
     assert row["api_key_env"] == "GEMINI_API_KEY"
-    assert row["model"] == "gemini-3.8-flash" and row["price_id"] == "google-gemini-3.8-flash"
+    assert row["model"] == "gemini-3.5-flash-lite" and row["price_id"] == "google-gemini-3.5-flash-lite"
     assert row["prompt"] == "fewshot_k10_v1" and row["dev_prompts"] == ["zeroshot_v1"] and row["test_subset"] == "S500"
-    assert row["params"] == {"temperature": 0, "reasoning_effort": "low", "max_completion_tokens": 1024}
-    assert row["supports_json_schema"] is False  # until check_free_tiers reports the strict schema accepted
+    # the least thinking it accepts (it rejects none): its usage block has no reasoning_tokens field
+    assert row["params"] == {"temperature": 0, "reasoning_effort": "minimal", "max_completion_tokens": 256}
+    assert row["supports_json_schema"] is True  # check_free_tiers, 2026-10-02: the strict schema was accepted
     assert row["reasoning_in_completion"] is True and row["drop_params"] == []
-    assert row["limits"] == {"rpm": 10, "rpd": 250}  # placeholders until the free-tier limits are confirmed
+    assert row["limits"] == {"rpm": 10, "rpd": 500}  # 500 a day as reported for September 2026; rpm kept low
 
 
 def test_every_api_row_runs_on_s500_and_s300_stays_pre_registered_but_unused():
@@ -101,7 +102,7 @@ def test_every_api_row_has_a_price_entry():
             Price.from_entry(entry)
             assert entry["model"] == row["model"], name  # the price is for the model the row sends
     assert [spec(name)["price_id"] for name in API_ROWS] == [
-        "groq-gpt-oss-20b", "groq-gpt-oss-120b", "groq-qwen3.8-27b", "google-gemini-3.8-flash",
+        "groq-gpt-oss-20b", "groq-gpt-oss-120b", "groq-qwen3.8-27b", "google-gemini-3.5-flash-lite",
     ]
     assert [spec(name)["price_id"] for name in LOCAL_ROWS] == [None, None]
     # the Qwen page lists no cached-input price, so none is assumed and caching changes nothing for that row
@@ -151,7 +152,7 @@ def test_the_planned_prices():
         "groq-gpt-oss-20b": {"input": 0.075, "cached_input": 0.037, "output": 0.30},
         "groq-gpt-oss-120b": {"input": 0.15, "cached_input": 0.075, "output": 0.60},
         "groq-qwen3.8-27b": {"input": 0.80, "output": 4.00},  # its page lists no cached-input price
-        "google-gemini-3.8-flash": {"input": 0.75, "cached_input": 0.075, "output": 3.75},  # through 2026-12-31
+        "google-gemini-3.5-flash-lite": {"input": 0.30, "cached_input": 0.03, "output": 2.50},
     }
 
 
@@ -169,7 +170,7 @@ RETRIEVED_ON = {
     "groq-gpt-oss-20b": "2026-10-02",
     "groq-gpt-oss-120b": "2026-10-01",
     "groq-qwen3.8-27b": "2026-10-02",
-    "google-gemini-3.8-flash": "2026-10-02",
+    "google-gemini-3.5-flash-lite": "2026-10-02",
     "free_tier_limits.groq": "2026-10-02",
     "free_tier_limits.gemini": "2026-10-02",
     "aws-g4dn.xlarge": "2026-10-01",
@@ -190,7 +191,7 @@ def test_the_specific_sources_are_the_ones_named_in_the_plan():
     assert urls["groq-gpt-oss-20b"] == "https://console.groq.com/docs/model/openai/gpt-oss-20b"
     assert urls["groq-gpt-oss-120b"] == "https://console.groq.com/docs/model/openai/gpt-oss-120b"
     assert urls["groq-qwen3.8-27b"] == "https://console.groq.com/docs/model/qwen/qwen3.8-27b"
-    assert urls["google-gemini-3.8-flash"] == "https://ai.google.dev/gemini-api/docs/pricing"
+    assert urls["google-gemini-3.5-flash-lite"] == "https://ai.google.dev/gemini-api/docs/pricing"
     assert urls["free_tier_limits.groq"] == "https://console.groq.com/docs/rate-limits"
     assert urls["free_tier_limits.gemini"] == "https://ai.google.dev/gemini-api/docs/rate-limits"
     assert urls["aws-g4dn.xlarge"] == "https://instances.vantage.sh/aws/ec2/g4dn.xlarge"
@@ -291,7 +292,7 @@ def test_the_method_page_names_every_system_and_dates_the_change_of_plan():
     changes = section(text, "Changes to the plan")
     assert "2026-10-02" in changes and "2026-07-30" in changes  # the day of the change, and the day GitHub Models was retired
     assert "https://github.blog/changelog/2026-06-16-github-models-is-no-longer-available-to-new-customers/" in changes
-    for name in ("groq-gpt-oss-20b-k10", "groq-qwen3.8-27b-k10", "gemini-3.8-flash-k10"):
+    for name in ("groq-gpt-oss-20b-k10", "groq-qwen3.8-27b-k10", "gemini-3.5-flash-lite-k10"):
         assert f"`{name}`" in changes, name
     assert "Google may use content sent on its free tier to improve its products" in text  # and only MASSIVE text is sent
 

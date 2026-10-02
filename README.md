@@ -31,7 +31,7 @@ and nothing below the "Results" heading has been produced.
 | `groq-gpt-oss-20b-k10` | openai/gpt-oss-20b | `fewshot_k10_v1` | Groq, free tier |
 | `groq-gpt-oss-120b-k10` | openai/gpt-oss-120b | `fewshot_k10_v1` | Groq, free tier |
 | `groq-qwen3.8-27b-k10` | qwen/qwen3.8-27b | `fewshot_k10_v1` | Groq, free tier |
-| `gemini-3.8-flash-k10` | gemini-3.8-flash | `fewshot_k10_v1` | Google AI Studio, free tier |
+| `gemini-3.5-flash-lite-k10` | gemini-3.5-flash-lite | `fewshot_k10_v1` | Google AI Studio, free tier |
 
 `fewshot_k10_v1` shows the model the 10 most similar training examples (embedding search with
 `BAAI/bge-small-en-v1.5`, over the train split only). The fine-tune is trained on MASSIVE's

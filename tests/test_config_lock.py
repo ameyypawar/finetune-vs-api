@@ -17,7 +17,7 @@ from finetune_vs_api.config import ConfigError, LockError
 API = "groq-gpt-oss-20b-k10"  # test subset S500, price groq-gpt-oss-20b, no checkpoint block
 OTHER_API = "groq-gpt-oss-120b-k10"  # the same endpoint, prompt and limits as API, with another model and price
 LOCAL = "ft-qwen3-4b-lora"
-API_ROWS = ["groq-gpt-oss-20b-k10", "groq-gpt-oss-120b-k10", "groq-qwen3.8-27b-k10", "gemini-3.8-flash-k10"]
+API_ROWS = ["groq-gpt-oss-20b-k10", "groq-gpt-oss-120b-k10", "groq-qwen3.8-27b-k10", "gemini-3.5-flash-lite-k10"]
 
 
 @pytest.fixture
@@ -80,9 +80,9 @@ def test_resolve_system_merges_the_endpoint_and_the_row(env):
     assert spec["model"] == "openai/gpt-oss-20b"
     assert spec["limits"]["rpm"] == 30 and spec["test_subset"] == "S500"
     assert spec["supports_json_schema"] is True and spec["reasoning_in_completion"] is True  # both from the endpoint
-    gemini = config.resolve_system("gemini-3.8-flash-k10", env.config_dir)  # another endpoint, merged the same way
+    gemini = config.resolve_system("gemini-3.5-flash-lite-k10", env.config_dir)  # another endpoint, merged the same way
     assert gemini["base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai"
-    assert gemini["api_key_env"] == "GEMINI_API_KEY" and gemini["supports_json_schema"] is False
+    assert gemini["api_key_env"] == "GEMINI_API_KEY" and gemini["supports_json_schema"] is True
 
 
 @pytest.mark.parametrize(
@@ -132,7 +132,7 @@ def test_every_api_row_has_its_own_hash(env):
     """Two rows on one endpoint differ in model and price; the row on another endpoint differs in its endpoint too."""
     hashes = {name: config.config_hash(name, **env.ckw) for name in API_ROWS}
     assert len(set(hashes.values())) == len(API_ROWS)
-    assert components(env, "gemini-3.8-flash-k10")["system"] != components(env, API)["system"]
+    assert components(env, "gemini-3.5-flash-lite-k10")["system"] != components(env, API)["system"]
 
 
 def test_changing_a_decoding_parameter_changes_only_decoding(env):

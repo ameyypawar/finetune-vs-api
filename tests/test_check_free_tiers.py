@@ -15,7 +15,7 @@ from finetune_vs_api import prompts, schema
 
 KEYS = {"GEMINI_API_KEY": "gemini-token", "GROQ_API_KEY": "groq-token"}
 GROQ_MODELS = ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"]  # one probe each, in the order of systems.yaml
-GEMINI_MODEL = "gemini-3.8-flash"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 #: No endpoint in the real configs has a catalog_url now, so the tests that cover the catalog give one to their own copy.
 CATALOG_URL = "https://catalog.example.test/catalog/models"
@@ -103,7 +103,7 @@ def env(tmp_path):
 
 def test_one_small_request_per_model_with_the_real_strict_schema(env):
     assert env.run() == 0
-    assert len(env.stub.posts) == 4  # the three Groq models and gemini-3.8-flash
+    assert len(env.stub.posts) == 4  # the three Groq models and gemini-3.5-flash-lite
     assert not [r for r in env.stub.requests if r.url.host == "127.0.0.1"]  # the local endpoint is not a free tier
     groq_bodies = env.stub.bodies("api.groq.com")
     assert [b["model"] for b in groq_bodies] == GROQ_MODELS  # one probe per model, none repeated
@@ -132,8 +132,8 @@ def test_each_probe_carries_the_decoding_parameters_of_its_row(env):
     [gemini_post] = [r for r in env.stub.posts if r.url.host == "generativelanguage.googleapis.com"]
     gemini = json.loads(gemini_post.content)
     assert str(gemini_post.url) == f"{GEMINI_URL}/chat/completions" and gemini["model"] == GEMINI_MODEL
-    assert (gemini["temperature"], gemini["reasoning_effort"], gemini["max_completion_tokens"]) == (0, "low", 1024)
-    # the probe asks whether the strict schema is accepted, although the configs say false for gemini until it is confirmed
+    assert (gemini["temperature"], gemini["reasoning_effort"], gemini["max_completion_tokens"]) == (0, "minimal", 256)
+    # the probe always asks whether the strict schema is accepted, whatever the config says
     assert gemini["response_format"]["json_schema"]["strict"] is True
 
 
@@ -155,7 +155,7 @@ def test_what_is_recorded_for_each_model(env):
     gemini = env.read("gemini")
     assert gemini["base_url"] == GEMINI_URL and set(gemini["models"]) == {GEMINI_MODEL}
     assert gemini["models"][GEMINI_MODEL]["answered"] is True
-    assert gemini["models"][GEMINI_MODEL]["model_returned"] == "gemini-3.8-flash-2026-09-01"
+    assert gemini["models"][GEMINI_MODEL]["model_returned"] == "gemini-3.5-flash-lite-2026-09-01"
     assert {p.stem for p in (env.results / "free_tiers").iterdir()} == {"groq", "gemini"}  # not local
 
 

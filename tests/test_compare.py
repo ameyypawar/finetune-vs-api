@@ -474,14 +474,14 @@ def test_a_model_name_that_changes_partway_through_is_flagged(tmp_path, monkeypa
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(GEMINI, models=lambda position: "gemini-3.8-flash-001" if position <= 120 else "gemini-3.8-flash-002")
+    lab.write_run(GEMINI, models=lambda position: "gemini-3.5-flash-lite-001" if position <= 120 else "gemini-3.5-flash-lite-002")
     lab.write_run(GPT_OSS_120B)
     doc = build(lab)
     names = system(doc, GEMINI)["model_names"]
     assert names["changed"] is True
-    assert names["returned"] == ["gemini-3.8-flash-001", "gemini-3.8-flash-002"]
+    assert names["returned"] == ["gemini-3.5-flash-lite-001", "gemini-3.5-flash-lite-002"]
     assert [(s["rows"], s["first_row"], s["last_row"]) for s in names["segments"]] == [(120, 1, 120), (380, 121, 500)]
-    assert names["requested"] == "gemini-3.8-flash"
+    assert names["requested"] == "gemini-3.5-flash-lite"
     flagged = [w for w in doc["warnings"] if "model name" in w]
     assert len(flagged) == 1 and GEMINI in flagged[0] and "answer 120 of 500" in flagged[0]
     assert system(doc, GPT_OSS_120B)["model_names"]["changed"] is False

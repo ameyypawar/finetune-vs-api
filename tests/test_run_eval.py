@@ -23,7 +23,7 @@ from stubs import FakeTime, chat_response, words
 
 GPT_OSS_20B = "groq-gpt-oss-20b-k10"  # groq, S500, rpm 30 / rpd 1000 / tpm 8000 / tpd 200000, strict schema sent, price groq-gpt-oss-20b
 QWEN_27B = "groq-qwen3.8-27b-k10"  # groq, S500, a price with no cached-input rate
-GEMINI = "gemini-3.8-flash-k10"  # gemini, S500, rpm 10 / rpd 250 (placeholders) and no token limits, strict schema not sent
+GEMINI = "gemini-3.5-flash-lite-k10"  # gemini, S500, rpm 10 / rpd 500 and no token limits, strict schema not sent
 LOCAL_BASE = "base-qwen3-4b-k10"
 LOCAL_FT = "ft-qwen3-4b-lora"
 KEYS = {"GROQ_API_KEY": "g", "GEMINI_API_KEY": "k"}
@@ -208,14 +208,15 @@ def test_the_strict_schema_is_sent_when_the_endpoint_is_configured_for_it(world)
 
 
 def test_the_strict_schema_is_not_sent_while_the_endpoint_is_unconfirmed(world):
-    outcome = world.run(GEMINI, "dev", subset="D50", limit=2)  # gemini: false until check_free_tiers reports it accepted
+    # an endpoint whose strict-schema support is not confirmed yet
+    world.edit_systems("    api_key_env: GEMINI_API_KEY\n    supports_json_schema: true", "    api_key_env: GEMINI_API_KEY\n    supports_json_schema: false")
+    outcome = world.run(GEMINI, "dev", subset="D50", limit=2)
     assert "response_format" not in world.bodies[0]
     assert outcome.summary["decoding"]["strict_json_schema_sent"] is False
 
 
-def test_flipping_the_flag_in_the_config_sends_the_schema(world):
-    world.edit_systems("    api_key_env: GEMINI_API_KEY\n    supports_json_schema: false", "    api_key_env: GEMINI_API_KEY\n    supports_json_schema: true")
-    outcome = world.run(GEMINI, "dev", subset="D50", limit=2)
+def test_a_confirmed_endpoint_is_sent_the_schema(world):
+    outcome = world.run(GEMINI, "dev", subset="D50", limit=2)  # gemini as shipped: confirmed on 2026-10-02
     assert world.bodies[0]["response_format"]["json_schema"]["strict"] is True
     assert outcome.summary["decoding"]["strict_json_schema_sent"] is True
 

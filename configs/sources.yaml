@@ -49,16 +49,15 @@ prices:
       input: 0.80
       output: 4.00
 
-  google-gemini-3.8-flash:
+  google-gemini-3.5-flash-lite:
     provider: google
-    model: gemini-3.8-flash
+    model: gemini-3.5-flash-lite
     url: https://ai.google.dev/gemini-api/docs/pricing
     retrieved_on: "2026-10-02"
-    # The page gives these prices through 2026-12-31 and 1.50 / 0.15 / 7.50 from 2027-01-01.
     usd_per_mtok:
-      input: 0.75
-      cached_input: 0.075
-      output: 3.75
+      input: 0.30
+      cached_input: 0.03
+      output: 2.50
 
 # --- free-tier limits, as published ----------------------------------------------------------
 # `observed` stays empty until scripts/check_free_tiers.py has run against the real endpoint.
@@ -89,12 +88,15 @@ free_tier_limits:
   gemini:
     url: https://ai.google.dev/gemini-api/docs/rate-limits
     retrieved_on: "2026-10-02"
-    # Not transcribed yet: the free-tier limits for this project are confirmed from AI Studio
-    # and the response headers when the key is first used.
+    # This page defers to AI Studio for free-tier limits. requests_per_day below is as reported
+    # for September 2026 by https://www.scriptbyai.com/gemini-api-free-tier-limits/ ("Gemini 3.5
+    # Flash-Lite and 3.1 Flash-Lite provide 500"; 3.5 to 3.8 Flash "around 20"). Observed on
+    # 2026-10-02: gemini-3.8-flash's 429 error gave quotaId
+    # GenerateRequestsPerDayPerProjectPerModel-FreeTier, quotaValue 20.
     models:
-      gemini-3.8-flash:
+      gemini-3.5-flash-lite:
         requests_per_minute: null
-        requests_per_day: null
+        requests_per_day: 500
     observed:
       checked_on: null
       models: null

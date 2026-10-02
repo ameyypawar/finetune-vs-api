@@ -13,7 +13,7 @@ The comparison has 6 systems:
 - `groq-gpt-oss-20b-k10`: openai/gpt-oss-20b, prompt `fewshot_k10_v1` (10 retrieved examples), Groq, free tier.
 - `groq-gpt-oss-120b-k10`: openai/gpt-oss-120b, prompt `fewshot_k10_v1` (10 retrieved examples), Groq, free tier.
 - `groq-qwen3.8-27b-k10`: qwen/qwen3.8-27b, prompt `fewshot_k10_v1` (10 retrieved examples), Groq, free tier.
-- `gemini-3.8-flash-k10`: gemini-3.8-flash, prompt `fewshot_k10_v1` (10 retrieved examples), Google AI Studio, free tier.
+- `gemini-3.5-flash-lite-k10`: gemini-3.5-flash-lite, prompt `fewshot_k10_v1` (10 retrieved examples), Google AI Studio, free tier.
 
 The fine-tune is a LoRA adapter (rank 16, alpha 32, 2 epochs) fitted to the human-labelled train split only; no API output is a label. The API systems run on free tiers with daily request caps, so every system is scored on a fixed, seeded test subset, stratified by scenario: S500 (500 items), S300 (300 items, inside S500). Each system's configuration must be locked, with a reason, before the runner will touch the test split. No money is spent on the API systems: their costs are computed at paid list prices.
 

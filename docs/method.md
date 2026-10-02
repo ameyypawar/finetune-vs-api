@@ -11,18 +11,30 @@ Six systems answer the same request, turning it into one JSON function call (an 
 slots), on the English part of MASSIVE 1.1: the LoRA fine-tune `ft-qwen3-4b-lora`, the untuned base
 model with retrieved examples `base-qwen3-4b-k10`, and four API models on free tiers:
 `groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10` and `groq-qwen3.8-27b-k10` on Groq, and
-`gemini-3.8-flash-k10` on Google AI Studio. `configs/systems.yaml` defines each one: endpoint, model,
+`gemini-3.5-flash-lite-k10` on Google AI Studio. `configs/systems.yaml` defines each one: endpoint, model,
 prompt, decoding. The fine-tune is the reference: every other system is compared with it.
+
+Thinking settings: the two gpt-oss rows reason at low effort, the lowest they offer, and their
+reasoning tokens are reported and priced. `groq-qwen3.8-27b-k10` runs with
+thinking off (`reasoning_effort: none`). `gemini-3.5-flash-lite-k10` runs at `minimal`, the least it
+accepts (it rejects `none`). Its usage block has no separate count of thinking tokens; at `minimal`, a probe's
+total equalled prompt plus completion and took about as long as with more thinking allowed.
 
 ## Changes to the plan
 
 - **2026-10-02.** Before any dev or test evaluation request had been sent, the two GitHub Models rows
   (`gh-gpt-4.1-mini-k10` and `gh-gpt-4.1-k10`, openai/gpt-4.1-mini and openai/gpt-4.1) were replaced
-  by `groq-gpt-oss-20b-k10` and `groq-qwen3.8-27b-k10` on Groq and `gemini-3.8-flash-k10` on Google AI
+  by `groq-gpt-oss-20b-k10` and `groq-qwen3.8-27b-k10` on Groq and `gemini-3.5-flash-lite-k10` on Google AI
   Studio's free tier. GitHub Models stopped taking new customers on 2026-06-16
   (<https://github.blog/changelog/2026-06-16-github-models-is-no-longer-available-to-new-customers/>)
   and was retired on 2026-07-30 (<https://www.developersdigest.tech/blog/github-models-retired-2026>);
   on 2026-10-02 its inference and catalog URLs answered a plain "OK" to every request.
+- **2026-10-02, later.** Before any test request, `gemini-3.8-flash-k10` was replaced by
+  `gemini-3.5-flash-lite-k10`. gemini-3.8-flash's free tier allows 20 requests per day (its 429 error:
+  quotaId `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, quotaValue 20), so S500 would have taken
+  25 days. Gemini 3.5 Flash-Lite's free tier is reported at 500 requests per day for September 2026
+  (<https://www.scriptbyai.com/gemini-api-free-tier-limits/>). The 14 dev items gemini-3.8-flash answered
+  before the cap are not part of the results.
 
 ## Metrics
 
