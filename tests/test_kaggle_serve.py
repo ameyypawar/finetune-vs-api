@@ -442,6 +442,34 @@ def test_vllm_with_lora_is_one_server_that_serves_the_base_and_every_adapter_by_
     assert [s.kind for s in session.prep] == ["vllm_env"]
 
 
+def test_vllm_lora_triton_is_the_same_server_with_triton_attention(sv, tmp_path, monkeypatch):
+    monkeypatch.delenv("VLLM_ATTENTION_BACKEND", raising=False)
+    (lora,) = plan(sv, sv.PATH_VLLM_LORA)
+    (triton,) = plan(sv, sv.PATH_VLLM_LORA_TRITON)
+    assert triton.argv == lora.argv and [v.key for v in triton.variants] == [v.key for v in lora.variants]
+    assert (triton.name, triton.log) == ("vllm-lora-triton", "vllm-lora-triton.log")
+    ctx = type("Ctx", (), {"scratch": tmp_path, "repo": None})()
+    assert sv.session_env(ctx, triton)["VLLM_ATTENTION_BACKEND"] == "TRITON_ATTN" == sv.TRITON_ATTENTION
+    assert "VLLM_ATTENTION_BACKEND" not in sv.session_env(ctx, lora)  # vLLM picks its own backend on the first path
+
+
+def test_the_cuda_stub_library_is_on_the_link_path_of_every_server(sv, tmp_path, monkeypatch):
+    stubs = tmp_path / "cuda" / "lib64" / "stubs"
+    stubs.mkdir(parents=True)
+    (stubs / "libcuda.so").write_bytes(b"")
+    (tmp_path / "empty").mkdir()
+    assert sv.cuda_stub_dirs((str(stubs), str(tmp_path / "empty"), str(tmp_path / "missing"))) == [str(stubs)]
+    ctx = type("Ctx", (), {"scratch": tmp_path, "repo": None})()
+    monkeypatch.setattr(sv, "cuda_stub_dirs", lambda candidates=sv.CUDA_STUB_DIRS: [str(stubs)])
+    monkeypatch.setenv("LIBRARY_PATH", "/already/there")
+    env = sv.server_env(ctx)
+    assert env["LIBRARY_PATH"] == os.pathsep.join([str(stubs), "/already/there"])
+    assert str(stubs) not in env.get("LD_LIBRARY_PATH", "")  # link time only: the real driver library loads at run time
+    monkeypatch.setattr(sv, "cuda_stub_dirs", lambda candidates=sv.CUDA_STUB_DIRS: [])
+    monkeypatch.delenv("LIBRARY_PATH")
+    assert "LIBRARY_PATH" not in sv.server_env(ctx)
+
+
 def test_the_other_paths_serve_one_model_per_server_with_the_base_first_and_the_fine_tune_last(sv):
     ft = [sv.Variant("ft", FT, FT, Path("/in/adapters/epoch-2"), 2), sv.Variant("base", BASE, BASE_MODEL)]
     merged = plan(sv, sv.PATH_VLLM_MERGED, ft)
@@ -467,9 +495,10 @@ def test_the_other_paths_serve_one_model_per_server_with_the_base_first_and_the_
 
 
 def test_the_serving_paths_are_in_the_order_the_brief_gives_and_only_the_last_has_no_throughput(sv):
-    assert sv.SERVING_PATHS == ("vllm-lora", "vllm-merged", "llamacpp-gguf", "hf-transformers")
-    assert [sv.PATH_INFO[p]["throughput"] for p in sv.SERVING_PATHS] == [True, True, True, False]
+    assert sv.SERVING_PATHS == ("vllm-lora", "vllm-lora-triton", "vllm-merged", "llamacpp-gguf", "hf-transformers")
+    assert [sv.PATH_INFO[p]["throughput"] for p in sv.SERVING_PATHS] == [True, True, True, True, False]
     assert sv.PATH_INFO["llamacpp-gguf"]["quantization"] == "q8_0" and sv.PATH_INFO["vllm-lora"]["engine"] == "vllm"
+    assert sv.PATH_INFO["vllm-lora-triton"]["engine"] == "vllm" and "Triton attention" in sv.PATH_INFO["vllm-lora-triton"]["weights"]
     assert sv.paths_from(None) == sv.SERVING_PATHS and sv.paths_from("llamacpp-gguf") == ("llamacpp-gguf", "hf-transformers")
     with pytest.raises(sv.Refused):
         sv.paths_from("vllm-turbo")
@@ -483,19 +512,21 @@ def test_the_ladder_stops_at_the_first_path_that_works_and_records_every_attempt
 
     def attempt(path):
         tried.append(path)
-        if path in ("vllm-lora", "vllm-merged"):
+        if path in ("vllm-lora", "vllm-lora-triton", "vllm-merged"):
             raise sv.PathFailed(f"{path} broke")
         return f"result of {path}"
 
     failures = []
     path, result, attempts = sv.run_ladder(sv.SERVING_PATHS, attempt, on_failure=lambda p, why: failures.append((p, why)))
-    assert (path, result) == ("llamacpp-gguf", "result of llamacpp-gguf") and tried == ["vllm-lora", "vllm-merged", "llamacpp-gguf"]  # the HF path never ran
+    assert (path, result) == ("llamacpp-gguf", "result of llamacpp-gguf")
+    assert tried == ["vllm-lora", "vllm-lora-triton", "vllm-merged", "llamacpp-gguf"]  # the HF path never ran
     assert attempts == [
         {"path": "vllm-lora", "status": "failed", "reason": "vllm-lora broke"},
+        {"path": "vllm-lora-triton", "status": "failed", "reason": "vllm-lora-triton broke"},
         {"path": "vllm-merged", "status": "failed", "reason": "vllm-merged broke"},
         {"path": "llamacpp-gguf", "status": "ok", "reason": None},
     ]
-    assert failures == [("vllm-lora", "vllm-lora broke"), ("vllm-merged", "vllm-merged broke")]
+    assert failures == [("vllm-lora", "vllm-lora broke"), ("vllm-lora-triton", "vllm-lora-triton broke"), ("vllm-merged", "vllm-merged broke")]
 
 
 def test_a_command_that_fails_counts_as_a_path_failure_but_a_bug_does_not(sv):
@@ -833,7 +864,8 @@ def test_a_failed_throughput_sweep_is_reported_and_does_not_undo_the_accuracy_re
 
 
 def test_when_vllm_with_lora_cannot_start_the_adapter_is_merged_and_served_without_lora(sv, lab):
-    code, launcher, _ = run(sv, lab, "dev-select", launcher=Launcher(sv, lab, fail={"vllm-lora": "triton LoRA kernel does not support sm75"}))
+    fail = {"vllm-lora": "triton LoRA kernel does not support sm75", "vllm-lora-triton": "nor with Triton attention"}
+    code, launcher, _ = run(sv, lab, "dev-select", launcher=Launcher(sv, lab, fail=fail))
     assert code == 0
     assert launcher.started == [("vllm-merged", "vllm-merged-base", ("base",)), ("vllm-merged", "vllm-merged-epoch-1", ("epoch-1",)),
                                 ("vllm-merged", "vllm-merged-epoch-2", ("epoch-2",))]
@@ -841,13 +873,14 @@ def test_when_vllm_with_lora_cannot_start_the_adapter_is_merged_and_served_witho
     assert record["serving"]["path"] == "vllm-merged" and record["serving"]["weights"].startswith("the adapter merged")
     assert record["serving"]["attempts"] == [
         {"path": "vllm-lora", "status": "failed", "reason": "triton LoRA kernel does not support sm75"},
+        {"path": "vllm-lora-triton", "status": "failed", "reason": "nor with Triton attention"},
         {"path": "vllm-merged", "status": "ok", "reason": None},
     ]
     assert record["chosen"]["epoch"] in (1, 2) and len(record["scores"]) == 3
 
 
 def test_nan_style_garbage_at_the_probe_falls_back_instead_of_being_reported(sv, lab):
-    launcher = Launcher(sv, lab, modes={"vllm-lora": "garbage"})
+    launcher = Launcher(sv, lab, modes={"vllm-lora": "garbage", "vllm-lora-triton": "garbage"})
     code, launcher, _ = run(sv, lab, "dev-select", launcher=launcher)
     assert code == 0
     record = read_json(lab.working / "results/serving/dev_select.json")
@@ -855,12 +888,14 @@ def test_nan_style_garbage_at_the_probe_falls_back_instead_of_being_reported(sv,
     assert first["path"] == "vllm-lora" and first["status"] == "failed" and "probe of" in first["reason"] and "fp16 overflow" in first["reason"]
     assert record["serving"]["path"] == "vllm-merged"
     assert all(s["exact_match"] > 0.9 for s in record["scores"])  # the numbers are from the path that worked, not the garbage
+    assert record["serving"]["attempts"][1]["path"] == "vllm-lora-triton" and record["serving"]["attempts"][1]["status"] == "failed"
     assert not (lab.working / "attempts" / "vllm-lora" / "results").exists()  # no run was even started on the broken path
 
 
 def test_garbage_that_only_shows_up_after_the_probe_discards_the_run_and_falls_back(sv, lab):
     probes = 3 * 8  # three variants on the one server, eight probe requests each
-    launcher = Launcher(sv, lab, modes={"vllm-lora": "garbage"}, normal_first={"vllm-lora": probes})
+    garbage = {"vllm-lora": "garbage", "vllm-lora-triton": "garbage"}
+    launcher = Launcher(sv, lab, modes=garbage, normal_first={"vllm-lora": probes, "vllm-lora-triton": probes})
     code, _, _ = run(sv, lab, "dev-select", launcher=launcher)
     assert code == 0
     record = read_json(lab.working / "results/serving/dev_select.json")
@@ -877,11 +912,11 @@ def test_garbage_that_only_shows_up_after_the_probe_discards_the_run_and_falls_b
 
 def test_the_test_run_falls_back_the_same_way_and_its_summaries_come_from_the_path_that_worked(sv, lab):
     locked_lab(lab)
-    launcher = Launcher(sv, lab, fail={"vllm-lora": "no", "vllm-merged": "no either"})
+    launcher = Launcher(sv, lab, fail={"vllm-lora": "no", "vllm-lora-triton": "nor with Triton attention", "vllm-merged": "no either"})
     code, launcher, bench = run(sv, lab, "test", launcher=launcher)
     assert code == 0
     record = read_json(lab.working / "test_run.json")
-    assert [a["path"] for a in record["serving"]["attempts"]] == ["vllm-lora", "vllm-merged", "llamacpp-gguf"]
+    assert [a["path"] for a in record["serving"]["attempts"]] == ["vllm-lora", "vllm-lora-triton", "vllm-merged", "llamacpp-gguf"]
     assert record["serving"]["path"] == "llamacpp-gguf" and record["serving"]["quantization"] == "q8_0"
     assert [s[1] for s in launcher.started] == ["llamacpp-gguf-base", "llamacpp-gguf-ft"]
     (call,) = bench.calls  # a serving path with throughput: the sweep runs on it
@@ -893,7 +928,7 @@ def test_the_test_run_falls_back_the_same_way_and_its_summaries_come_from_the_pa
 
 def test_the_last_resort_gives_accuracy_only_with_no_throughput_and_no_cost_figure(sv, lab, capsys):
     locked_lab(lab)
-    fail = {"vllm-lora": "a", "vllm-merged": "b", "llamacpp-gguf": "c"}
+    fail = {"vllm-lora": "a", "vllm-lora-triton": "a2", "vllm-merged": "b", "llamacpp-gguf": "c"}
     code, launcher, bench = run(sv, lab, "test", launcher=Launcher(sv, lab, fail=fail))
     assert code == 0 and bench.calls == []  # the sweep is never run on this path
     assert [s[1] for s in launcher.started if s[0] == "hf-transformers"] == ["hf-transformers-base", "hf-transformers-ft"]
@@ -901,7 +936,7 @@ def test_the_last_resort_gives_accuracy_only_with_no_throughput_and_no_cost_figu
     assert record["serving"]["path"] == "hf-transformers" and record["serving"]["throughput_measured"] is False
     assert record["throughput"]["status"] == "skipped" and "no throughput and no cost figure" in record["throughput"]["reason"]
     assert not (lab.working / "results" / "serving" / "T4.json").exists()
-    assert [a["status"] for a in record["serving"]["attempts"]] == ["failed", "failed", "failed", "ok"]
+    assert [a["status"] for a in record["serving"]["attempts"]] == ["failed", "failed", "failed", "failed", "ok"]
     assert (lab.working / "results/runs" / f"{FT}__test/summary.S300.json").exists()  # the accuracy numbers are all there
 
 

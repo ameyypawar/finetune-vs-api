@@ -187,6 +187,7 @@ def test_vllm_is_installed_pinned_into_a_venv_of_its_own_with_uv(sv):
 def test_the_llama_cpp_fallback_builds_for_the_t4_and_serves_q8_gguf(sv):
     build, compile_ = sv.llama_build_commands(Path("/src"), Path("/src/build"), 4)
     assert "-DGGML_CUDA=ON" in build and "-DCMAKE_CUDA_ARCHITECTURES=75" in build  # compute capability 7.5
+    assert "-DGGML_CUDA_NO_VMM=ON" in build  # no link to the driver library, which Kaggle's image does not expose
     assert compile_[-2:] == ["--target", "llama-server"] and compile_[compile_.index("-j") + 1] == "4"
     convert = sv.convert_gguf_command("python", Path("/src"), Path("/tmp/merged/ft"), Path("/tmp/gguf/ft.gguf"))
     assert convert[1].endswith("convert_hf_to_gguf.py") and convert[convert.index("--outtype") + 1] == "q8_0" == sv.GGUF_QUANT

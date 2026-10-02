@@ -67,17 +67,24 @@ What it does, in order, stopping at the first thing that is wrong:
         1. vllm-lora      vLLM 0.11.2 (the version Unsloth's Kaggle T4 notebooks use), fp16,
                           --enable-lora --lora-modules, --max-lora-rank 16,
                           --generation-config vllm, temperature 0
-        2. vllm-merged    the adapter merged into fp16 weights (finetune_vs_api.lora_merge: numpy
+        2. vllm-lora-triton  the same with Triton attention (VLLM_ATTENTION_BACKEND=TRITON_ATTN), which
+                          builds no kernels when the server starts. On a T4 vLLM otherwise picks
+                          FlashInfer, which compiles and links its kernels at startup
+        3. vllm-merged    the adapter merged into fp16 weights (finetune_vs_api.lora_merge: numpy
                           and the safetensors format, the arithmetic PEFT does), served by vLLM
                           without LoRA
-        3. llamacpp-gguf  llama.cpp's CUDA server on GGUF q8_0 weights of the merged model
-        4. hf-transformers  accuracy only: transformers on the merged weights, one request at a
+        4. llamacpp-gguf  llama.cpp's CUDA server on GGUF q8_0 weights of the merged model
+        5. hf-transformers  accuracy only: transformers on the merged weights, one request at a
                           time (finetune_vs_api.hf_server): no throughput and no cost figure,
                           because that is not how anyone would serve it
       A path is abandoned, and its output kept under attempts/ and never reported, when it cannot
       be installed or started, when a probe request returns NaN-style garbage or too little valid
       JSON (fp16 overflow), or when a finished run is implausible (empty or repeated output,
       replies that never stop, many failed calls).
+    * puts the CUDA toolkit's link-time stub of the driver library (stubs/libcuda.so) on LIBRARY_PATH
+      for every server it starts. Kaggle's image has none on the linker's path, so on 2026-10-02 the
+      first dev-select run could not link FlashInfer's kernels ("ld: cannot find -lcuda"), and every
+      faster path fell through to hf-transformers;
     * serves the model on 127.0.0.1:8000, as configs/systems.yaml's local endpoint says: that
       address is part of the test lock.
 
@@ -161,14 +168,24 @@ READY_TIMEOUT_S = 1800  # downloading 8 GB, loading, compiling and capturing gra
 HEALTH_POLL_S = 5.0
 
 PATH_VLLM_LORA = "vllm-lora"
+PATH_VLLM_LORA_TRITON = "vllm-lora-triton"
 PATH_VLLM_MERGED = "vllm-merged"
 PATH_LLAMACPP = "llamacpp-gguf"
 PATH_HF = "hf-transformers"
-SERVING_PATHS = (PATH_VLLM_LORA, PATH_VLLM_MERGED, PATH_LLAMACPP, PATH_HF)
+SERVING_PATHS = (PATH_VLLM_LORA, PATH_VLLM_LORA_TRITON, PATH_VLLM_MERGED, PATH_LLAMACPP, PATH_HF)
+#: The attention backend of vllm-lora-triton. On a T4 (compute capability 7.5) vLLM cannot use FlashAttention 2
+#: and picks FlashInfer, which compiles its kernels at startup; Triton attention needs no build.
+TRITON_ATTENTION = "TRITON_ATTN"
+#: Where CUDA toolkits keep libcuda.so, the link-time stub of the driver library.
+CUDA_STUB_DIRS = ("/usr/local/cuda/lib64/stubs", "/usr/local/cuda/targets/x86_64-linux/lib/stubs")
 PATH_INFO: dict[str, dict[str, Any]] = {
     PATH_VLLM_LORA: {
         "engine": "vllm", "dtype": "float16", "quantization": None, "throughput": True,
         "weights": "fp16 base weights, the LoRA adapter applied by vLLM at request time",
+    },
+    PATH_VLLM_LORA_TRITON: {
+        "engine": "vllm", "dtype": "float16", "quantization": None, "throughput": True,
+        "weights": "fp16 base weights, the LoRA adapter applied by vLLM at request time, with Triton attention",
     },
     PATH_VLLM_MERGED: {
         "engine": "vllm", "dtype": "float16", "quantization": None, "throughput": True,
@@ -740,8 +757,10 @@ def vllm_install_commands(env_dir: Path, python: str | None = None) -> list[list
 
 def llama_build_commands(src_dir: Path, build_dir: Path, jobs: int) -> list[list[str]]:
     return [
+        # GGML_CUDA_NO_VMM: no virtual memory management, so ggml-cuda does not link the driver library, which
+        # the first run's configure step could not find on Kaggle (target CUDA::cuda_driver "not found")
         ["cmake", "-S", str(src_dir), "-B", str(build_dir), "-DGGML_CUDA=ON", "-DCMAKE_CUDA_ARCHITECTURES=75",
-         "-DCMAKE_BUILD_TYPE=Release", "-DLLAMA_CURL=OFF"],
+         "-DGGML_CUDA_NO_VMM=ON", "-DCMAKE_BUILD_TYPE=Release", "-DLLAMA_CURL=OFF"],
         ["cmake", "--build", str(build_dir), "--config", "Release", "-j", str(jobs), "--target", "llama-server"],
     ]
 
@@ -819,10 +838,10 @@ def plan_sessions(
         raise ValueError(f"unknown serving path {path!r}")
     base_url = f"http://{host}:{port}/v1"
     vllm = scratch / "vllm-env" / "bin" / "vllm"
-    if path == PATH_VLLM_LORA:
+    if path in (PATH_VLLM_LORA, PATH_VLLM_LORA_TRITON):  # the same server; session_env sets the attention backend
         adapters = {v.model: v.adapter for v in variants if v.adapter is not None}
         argv = vllm_command(vllm, model=base_model, host=host, port=port, revision=revision, lora_modules=adapters)
-        return [SessionPlan(path, "vllm-lora", tuple(variants), base_url, argv, "vllm-lora.log", (PrepStep("vllm_env"),))]
+        return [SessionPlan(path, path, tuple(variants), base_url, argv, f"{path}.log", (PrepStep("vllm_env"),))]
     sessions = []
     for variant in sorted(variants, key=lambda v: v.adapter is not None):
         merged = scratch / "merged" / variant.key
@@ -978,11 +997,31 @@ class Context:
 # --- preparing a session: installs, merges, conversions --------------------------------------------------------------------------------------------------------------
 
 
+def cuda_stub_dirs(candidates: Sequence[str] = CUDA_STUB_DIRS) -> list[str]:
+    """The candidate directories that hold libcuda.so, the link-time stub of the CUDA driver library."""
+    return [d for d in candidates if (Path(d) / "libcuda.so").is_file()]
+
+
 def server_env(ctx: Context) -> dict[str, str]:
-    return {
+    env = {
         **os.environ, "CUDA_VISIBLE_DEVICES": "0", "HF_HOME": str(ctx.scratch / "hf"), "HF_HUB_DISABLE_TELEMETRY": "1",
         "TOKENIZERS_PARALLELISM": "false",
     }
+    stubs = cuda_stub_dirs()
+    if stubs:  # for linking kernels built at startup only: at run time the real driver library is loaded
+        env["LIBRARY_PATH"] = os.pathsep.join([*stubs, *filter(None, [os.environ.get("LIBRARY_PATH")])])
+    return env
+
+
+def session_env(ctx: Context, plan: SessionPlan) -> dict[str, str]:
+    """server_env plus what one path needs: the snapshot's src/ for hf_server, Triton attention for vllm-lora-triton."""
+    env = server_env(ctx)
+    if plan.path == PATH_HF:  # finetune_vs_api.hf_server is imported from the snapshot's src/, in a process of its own
+        assert ctx.repo is not None
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(ctx.repo.root / "src"), env.get("PYTHONPATH")]))
+    if plan.path == PATH_VLLM_LORA_TRITON:
+        env["VLLM_ATTENTION_BACKEND"] = TRITON_ATTENTION
+    return env
 
 
 def vllm_python(ctx: Context) -> Path:
@@ -1114,9 +1153,8 @@ def launch_session(ctx: Context, plan: SessionPlan, revision: str, base_model: s
     the GPU memory is waited for before returning."""
     ctx.prepare(ctx, plan, revision, base_model)
     assert ctx.repo is not None
-    env = server_env(ctx)
-    if plan.path == PATH_HF:  # finetune_vs_api.hf_server is imported from the snapshot's src/, in a process of its own
-        env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(ctx.repo.root / "src"), env.get("PYTHONPATH")]))
+    env = session_env(ctx, plan)
+    if plan.path == PATH_HF:
         for package in ("transformers", "torch"):
             ctx.engine_versions[package] = package_version(sys.executable, package)
     health = plan.base_url.rsplit("/v1", 1)[0] + "/health"
@@ -1317,7 +1355,7 @@ def resolve_locked_adapter(checkpoint: Mapping[str, Any], adapters: Mapping[int,
 
 def _bench_python(ctx: Context, path: str) -> str:
     """The vLLM venv has the openai package (vLLM needs it); otherwise this interpreter, which gets it installed."""
-    return str(vllm_python(ctx)) if path in (PATH_VLLM_LORA, PATH_VLLM_MERGED) and vllm_python(ctx).exists() else sys.executable
+    return str(vllm_python(ctx)) if path in (PATH_VLLM_LORA, PATH_VLLM_LORA_TRITON, PATH_VLLM_MERGED) and vllm_python(ctx).exists() else sys.executable
 
 
 def run_bench(
