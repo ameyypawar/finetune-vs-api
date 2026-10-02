@@ -89,12 +89,18 @@ The adapter location above is a placeholder until the adapter is published.
 
 ## Training details
 
-No training run has finished yet. These are the planned settings from `configs/train.yaml`, not the record of a run.
+Read from the training log (`results/train_log.json`, written by `kaggle/train_on_kaggle.py`).
 
 - Base model: `Qwen/Qwen3-4B-Instruct-2507`, revision `cdbee75f17c01a7cc42f958dc650907174af0554`.
 - Method: LoRA with rank 16, alpha 32 and dropout 0.0, on q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj; the base weights were quantized while training (`load_in_4bit`, QLoRA).
 - Data: the train split of MASSIVE (11,514 requests) with its human labels, converted to chat records. Labels never come from an API model.
 - Optimisation: learning rate 0.0002, linear schedule with warmup ratio 0.03, weight decay 0.01, optimizer adamw_8bit, 2 epochs, batch size 8 with 2 gradient accumulation steps, maximum sequence length 512, seed 3407.
+- Precision: fp16.
+- Hardware: Tesla T4, 48.2 minutes.
+- Final training loss 0.0954; validation loss 0.0605 after epoch 1, 0.0527 after epoch 2.
+- An adapter was saved after each of the epochs 1, 2; the epoch is chosen on the dev split and pinned in `configs/systems.yaml`.
+- Training files: `sft_train.jsonl` (11,514 records, sha256 `97418d8f03494a2b4422dc4745237cec5d886890ac8f995e32547f76eb24eb9c`); `sft_dev.jsonl` (2,033 records, sha256 `1dd2d0e5d6cfa48f21c868448d36c194a703915d17252a60db485f2e788b8996`).
+- Packages: unsloth 2026.9.12, unsloth_zoo 2026.9.8, trl 0.24.0, transformers 5.5.0, peft 0.21.1, accelerate 1.15.0, bitsandbytes 0.50.2, datasets 4.3.0, torch 2.10.0+cu128, xformers 0.0.35, tokenizers 0.22.2, huggingface-hub 1.11.0.
 
 ## Evaluation
 
