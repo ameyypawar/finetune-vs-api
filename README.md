@@ -14,7 +14,10 @@ the request. The data is the English (en-US) part of MASSIVE 1.1 (11,514 train, 
 
 **Status: work in progress, with no results yet.** The data pipeline, metrics, cost arithmetic,
 test lock, API client and evaluation runner exist and are tested against stubs. The Kaggle
-training script is written but has not been run. No model has been trained, no API has been
+training script, and the Kaggle script that serves the model, picks the checkpoint on dev, runs
+the locked test and measures throughput (`kaggle/serve/`), are written but have not been run. The
+comparison, the figures and the generated docs (`scripts/compare.py`, `make_figures.py`,
+`render.py`) are tested on synthetic results only. No model has been trained, no API has been
 called, and nothing below the "Results" heading has been produced.
 
 ## What will be compared
@@ -101,10 +104,15 @@ The audit reports them so a reader can judge how much they matter.
 ```
 configs/      data, training, prices and limits, systems
 src/finetune_vs_api/   data, schema, metrics, cost, config and test lock, prompts,
-                       retrieval, subsets, client, evaluate
-scripts/      prepare_data, make_subsets, lock_test, run_eval, check_free_tiers, validate_chat_jsonl
-kaggle/       the training script and metadata (written, not run)
-results/      the audit, subsets, lock history, free-tier checks, runs
+                       retrieval, subsets, client, evaluate, lora_merge, hf_server
+scripts/      prepare_data, make_subsets, lock_test, run_eval, check_free_tiers, validate_chat_jsonl,
+              bench_throughput, compare, make_figures, render
+kaggle/       the training script and metadata (written, not run); serve/ holds the serving,
+              dev-selection, locked-test and throughput script and its metadata (written, not run)
+templates/    the README results block, the model card and the write-up, filled in from results/
+docs/         method.md (how everything is measured) and writeup.md (generated draft)
+hf/           the model card for the adapter (generated)
+results/      the audit, subsets, lock history, free-tier checks, runs, comparison, figures
 tests/
 ```
 
