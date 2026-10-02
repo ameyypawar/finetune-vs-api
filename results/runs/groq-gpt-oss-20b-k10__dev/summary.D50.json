@@ -1,0 +1,168 @@
+{
+  "system": "groq-gpt-oss-20b-k10",
+  "split": "dev",
+  "subset": {
+    "name": "D50",
+    "n": 50,
+    "hash": "5af16349743833ae66595cf9a2920c43033ede6a8a0c53ae1f3178bde41a8fe3"
+  },
+  "status": "complete",
+  "stop": null,
+  "n_scored": 50,
+  "n_calls_failed": 0,
+  "limit": null,
+  "resumed": false,
+  "billing_basis": "free tier; priced at paid list price",
+  "prompt": {
+    "name": "fewshot_k10_v1",
+    "hash": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c"
+  },
+  "config_hash": "2ddac38db7c311e76db95405d49c424d9391e343aeeff1b88a96989e06e124ae",
+  "config_components": {
+    "prompt": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c",
+    "schema": "5e2268508be3b063a5b20dee6acad733a618d30ca936e0198b6c4497080e6526",
+    "system": "e00c337398877ab3a76e207f58de11b8aca30ea3ee83ffc79d9f20188cef8834",
+    "decoding": "86737bd8ebd21913998467bbb8c9cceef173b84a4f995854141d0f3f70934303",
+    "checkpoint": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "prices": "b5f48f3c4927d0ae5098d9ee6ff8c41b16defa25b19f4ca167a932d59d68dc78",
+    "dataset": "006820b6b7e8c3b6cf36d8ebc4f6fbf4745ff0e02c4605a3cf5ffe7f4a91be29"
+  },
+  "git_commit": "be4ebac06df5914a9b21a2fbda914eb9bfd01e10",
+  "git_dirty": true,
+  "created_at": "2026-10-02T06:04:30Z",
+  "lock": null,
+  "endpoint": {
+    "name": "groq",
+    "base_url": "https://api.groq.com/openai/v1",
+    "model_requested": "openai/gpt-oss-20b",
+    "models_returned": {
+      "openai/gpt-oss-20b": 50
+    },
+    "tier": null
+  },
+  "decoding": {
+    "params": {
+      "temperature": 0,
+      "reasoning_effort": "low",
+      "max_completion_tokens": 1024
+    },
+    "drop_params": [],
+    "strict_json_schema_sent": true
+  },
+  "metrics": {
+    "n": 50,
+    "exact_match": {
+      "value": 0.68,
+      "ci95": [
+        0.54,
+        0.8
+      ]
+    },
+    "intent_accuracy": {
+      "value": 0.94,
+      "ci95": [
+        0.86,
+        1.0
+      ]
+    },
+    "slot_precision": {
+      "value": 0.7647058823529411,
+      "ci95": [
+        0.6346153846153846,
+        0.8958333333333334
+      ]
+    },
+    "slot_recall": {
+      "value": 0.8125,
+      "ci95": [
+        0.6828991130820402,
+        0.9333333333333333
+      ]
+    },
+    "slot_f1": {
+      "value": 0.787878787878788,
+      "ci95": [
+        0.6792366280076164,
+        0.888888888888889
+      ]
+    },
+    "schema_valid_rate": {
+      "value": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    "unfound_value_rate": {
+      "value": 0.0196078431372549,
+      "ci95": [
+        0.0,
+        0.06557377049180328
+      ]
+    },
+    "slot_counts": {
+      "tp": 39,
+      "fp": 12,
+      "fn": 9
+    },
+    "predicted_slots": 51
+  },
+  "latency_s": {
+    "p50": 0.5056291250512004,
+    "p95": 0.7810399589361623,
+    "n": 50,
+    "method": "nearest-rank",
+    "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+  },
+  "tokens": {
+    "calls_with_reported_usage": 50,
+    "calls_with_estimated_usage": 0,
+    "calls_without_usage": 0
+  },
+  "cost": {
+    "billing_basis": "free tier; priced at paid list price",
+    "calls": 50,
+    "calls_with_reported_usage": 50,
+    "calls_with_estimated_usage": 0,
+    "prompt_tokens": 74190,
+    "completion_tokens": 2853,
+    "reasoning_tokens": 1390,
+    "cacheable_prefix_tokens": 577,
+    "total_usd": {
+      "upper": 0.0064201499999999995,
+      "lower": 0.005323850000000001
+    },
+    "per_1k_calls_usd": {
+      "upper": 0.128403,
+      "lower": 0.10647700000000002
+    },
+    "price": {
+      "id": "groq-gpt-oss-20b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "url": "https://console.groq.com/docs/model/openai/gpt-oss-20b",
+      "retrieved_on": "2026-10-02",
+      "usd_per_mtok": {
+        "input": 0.075,
+        "cached_input": 0.037,
+        "output": 0.3
+      }
+    }
+  },
+  "calls": {
+    "finish_reasons": {
+      "stop": 50
+    },
+    "errors_by_kind": {},
+    "retries_total": 1,
+    "last_ratelimit_headers": {
+      "x-ratelimit-limit-requests": "1000",
+      "x-ratelimit-limit-tokens": "8000",
+      "x-ratelimit-remaining-requests": "949",
+      "x-ratelimit-remaining-tokens": "1881",
+      "x-ratelimit-reset-requests": "1h13m26.4s",
+      "x-ratelimit-reset-tokens": "45.892s"
+    }
+  },
+  "predictions": "results/runs/groq-gpt-oss-20b-k10__dev/predictions.jsonl"
+}

@@ -1,0 +1,191 @@
+{
+  "endpoint": "groq",
+  "base_url": "https://api.groq.com/openai/v1",
+  "checked_at": "2026-10-02T05:54:22Z",
+  "models": {
+    "openai/gpt-oss-120b": {
+      "model_requested": "openai/gpt-oss-120b",
+      "tier": null,
+      "checked_at": "2026-10-02T05:54:23Z",
+      "probe": {
+        "prompt": "zeroshot_v1",
+        "request": "wake me up at five am this week"
+      },
+      "strict_json_schema_accepted": true,
+      "attempts": [
+        {
+          "kind": "strict_json_schema",
+          "sent_at": "2026-10-02T05:54:23Z",
+          "status": 200,
+          "error": null,
+          "model_returned": "openai/gpt-oss-120b",
+          "finish_reason": "stop",
+          "latency_s": 0.6694,
+          "ratelimit_headers": {
+            "x-ratelimit-limit-requests": "1000",
+            "x-ratelimit-limit-tokens": "8000",
+            "x-ratelimit-remaining-requests": "999",
+            "x-ratelimit-remaining-tokens": "6526",
+            "x-ratelimit-reset-requests": "1m26.4s",
+            "x-ratelimit-reset-tokens": "11.055s"
+          },
+          "answer_preview": "{\"intent\":\"alarm_set\",\"slots\":[{\"type\":\"time\",\"value\":\"five am\"},{\"type\":\"date\",\"value\":\"this week\"}]}",
+          "answer_valid_for_schema": true,
+          "usage_reported": true,
+          "usage_fields_present": [
+            "prompt_tokens",
+            "completion_tokens",
+            "reasoning_tokens"
+          ],
+          "usage": {
+            "prompt_tokens": 1145,
+            "completion_tokens": 110,
+            "cached_tokens": null,
+            "reasoning_tokens": 69,
+            "reported": true,
+            "estimated": false,
+            "estimate_method": null
+          }
+        }
+      ],
+      "answered": true,
+      "model_returned": "openai/gpt-oss-120b",
+      "usage_reported": true,
+      "usage_fields_present": [
+        "prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens"
+      ],
+      "ratelimit_headers": {
+        "x-ratelimit-limit-requests": "1000",
+        "x-ratelimit-limit-tokens": "8000",
+        "x-ratelimit-remaining-requests": "999",
+        "x-ratelimit-remaining-tokens": "6526",
+        "x-ratelimit-reset-requests": "1m26.4s",
+        "x-ratelimit-reset-tokens": "11.055s"
+      }
+    },
+    "openai/gpt-oss-20b": {
+      "model_requested": "openai/gpt-oss-20b",
+      "tier": null,
+      "checked_at": "2026-10-02T05:54:22Z",
+      "probe": {
+        "prompt": "zeroshot_v1",
+        "request": "wake me up at five am this week"
+      },
+      "strict_json_schema_accepted": true,
+      "attempts": [
+        {
+          "kind": "strict_json_schema",
+          "sent_at": "2026-10-02T05:54:22Z",
+          "status": 200,
+          "error": null,
+          "model_returned": "openai/gpt-oss-20b",
+          "finish_reason": "stop",
+          "latency_s": 0.5392,
+          "ratelimit_headers": {
+            "x-ratelimit-limit-requests": "1000",
+            "x-ratelimit-limit-tokens": "8000",
+            "x-ratelimit-remaining-requests": "999",
+            "x-ratelimit-remaining-tokens": "6657",
+            "x-ratelimit-reset-requests": "1m26.4s",
+            "x-ratelimit-reset-tokens": "10.072s"
+          },
+          "answer_preview": "{\"intent\":\"alarm_set\",\"slots\":[{\"type\":\"time\",\"value\":\"five am\"},{\"type\":\"date\",\"value\":\"this week\"}]}",
+          "answer_valid_for_schema": true,
+          "usage_reported": true,
+          "usage_fields_present": [
+            "prompt_tokens",
+            "completion_tokens",
+            "reasoning_tokens"
+          ],
+          "usage": {
+            "prompt_tokens": 1145,
+            "completion_tokens": 87,
+            "cached_tokens": null,
+            "reasoning_tokens": 46,
+            "reported": true,
+            "estimated": false,
+            "estimate_method": null
+          }
+        }
+      ],
+      "answered": true,
+      "model_returned": "openai/gpt-oss-20b",
+      "usage_reported": true,
+      "usage_fields_present": [
+        "prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens"
+      ],
+      "ratelimit_headers": {
+        "x-ratelimit-limit-requests": "1000",
+        "x-ratelimit-limit-tokens": "8000",
+        "x-ratelimit-remaining-requests": "999",
+        "x-ratelimit-remaining-tokens": "6657",
+        "x-ratelimit-reset-requests": "1m26.4s",
+        "x-ratelimit-reset-tokens": "10.072s"
+      }
+    },
+    "qwen/qwen3.8-27b": {
+      "model_requested": "qwen/qwen3.8-27b",
+      "tier": null,
+      "checked_at": "2026-10-02T05:54:23Z",
+      "probe": {
+        "prompt": "zeroshot_v1",
+        "request": "wake me up at five am this week"
+      },
+      "strict_json_schema_accepted": true,
+      "attempts": [
+        {
+          "kind": "strict_json_schema",
+          "sent_at": "2026-10-02T05:54:23Z",
+          "status": 200,
+          "error": null,
+          "model_returned": "qwen/qwen3.8-27b",
+          "finish_reason": "stop",
+          "latency_s": 0.2186,
+          "ratelimit_headers": {
+            "x-ratelimit-limit-requests": "1000",
+            "x-ratelimit-limit-tokens": "8000",
+            "x-ratelimit-remaining-requests": "999",
+            "x-ratelimit-remaining-tokens": "7140",
+            "x-ratelimit-reset-requests": "1m26.4s",
+            "x-ratelimit-reset-tokens": "6.45s"
+          },
+          "answer_preview": "{\"intent\": \"alarm_set\", \"slots\": [{\"type\": \"time\", \"value\": \"five am\"}, {\"type\": \"general_frequency\", \"value\": \"this week\"}]}",
+          "answer_valid_for_schema": true,
+          "usage_reported": true,
+          "usage_fields_present": [
+            "prompt_tokens",
+            "completion_tokens"
+          ],
+          "usage": {
+            "prompt_tokens": 604,
+            "completion_tokens": 39,
+            "cached_tokens": null,
+            "reasoning_tokens": null,
+            "reported": true,
+            "estimated": false,
+            "estimate_method": null
+          }
+        }
+      ],
+      "answered": true,
+      "model_returned": "qwen/qwen3.8-27b",
+      "usage_reported": true,
+      "usage_fields_present": [
+        "prompt_tokens",
+        "completion_tokens"
+      ],
+      "ratelimit_headers": {
+        "x-ratelimit-limit-requests": "1000",
+        "x-ratelimit-limit-tokens": "8000",
+        "x-ratelimit-remaining-requests": "999",
+        "x-ratelimit-remaining-tokens": "7140",
+        "x-ratelimit-reset-requests": "1m26.4s",
+        "x-ratelimit-reset-tokens": "6.45s"
+      }
+    }
+  }
+}
