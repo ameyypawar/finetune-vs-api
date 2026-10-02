@@ -261,5 +261,5 @@ def test_dataset_metadata_satisfies_the_kaggle_cli_and_carries_the_attribution()
 
 def test_the_kaggle_directory_holds_only_what_belongs_there():
     assert sorted(p.name for p in KAGGLE.iterdir() if not p.name.startswith(("__", "."))) == [
-        "dataset-metadata.json", "kernel-metadata.json", "train_on_kaggle.py",
-    ]
+        "dataset-metadata.json", "kernel-metadata.json", "serve", "train_on_kaggle.py",
+    ]  # serve/ is the serving and evaluation stage: tests/test_kaggle_serve_files.py covers it

@@ -1,0 +1,7 @@
+{
+  "title": "finetune-vs-api-snapshot",
+  "id": "ameypawar123456789/finetune-vs-api-snapshot",
+  "subtitle": "The finetune-vs-api repository and its processed MASSIVE data",
+  "description": "One tarball, finetune-vs-api-snapshot.tar.gz: the tracked files of the finetune-vs-api repository (code, configs, tests, results, including the test lock) and data/processed, which holds the train, dev and test splits of MASSIVE 1.1 (en-US) as JSON function calls, the SFT files and the fixed evaluation subsets. Derived from MASSIVE (Amazon, CC BY 4.0), whose English text comes from SLURP (CC BY 4.0). Change made: the [label : value] slot annotations were converted to JSON. Attribution and citations: NOTICE.md inside the tarball. Licence: the code is MIT and the data CC BY 4.0, given as 'other' because it is stated here rather than chosen from Kaggle's list. This dataset includes the test split and the locked configuration, so it must stay private: it exists so that the serving kernel reads the data and the lock from the same commit that was published. Prepared with the command in kaggle/serve/serve_eval_on_kaggle.py.",
+  "licenses": [{"name": "other"}]
+}
