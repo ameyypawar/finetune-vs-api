@@ -184,7 +184,7 @@ def test_changing_the_label_inventory_changes_the_schema_and_the_prompt(env):
 
 def test_the_checkpoint_is_part_of_the_hash(env):
     before = components(env, "base-qwen3-4b-k10")
-    edit(env, "systems.yaml", "    checkpoint:\n      base_revision: null", "    checkpoint:\n      base_revision: abc123")
+    edit(env, "systems.yaml", "    checkpoint:\n      base_revision: cdbee75f17c01a7cc42f958dc650907174af0554", "    checkpoint:\n      base_revision: abc123")
     assert changed(before, components(env, "base-qwen3-4b-k10")) == ["checkpoint"]
 
 
@@ -324,11 +324,15 @@ def test_every_api_row_can_be_locked_as_shipped(env, system):
 
 
 def test_an_incomplete_system_cannot_be_locked(env):
-    blockers = config.lock_blockers(LOCAL, config_dir=env.config_dir)
-    assert {"checkpoint.adapter", "checkpoint.epoch", "checkpoint.base_revision"} <= {b.split(" ")[0] for b in blockers}
+    blockers = {b.split(" ")[0] for b in config.lock_blockers(LOCAL, config_dir=env.config_dir)}
+    assert {"checkpoint.adapter", "checkpoint.epoch"} <= blockers
+    assert "checkpoint.base_revision" not in blockers  # pinned in configs/systems.yaml
     with pytest.raises(LockError, match="cannot lock"):
         lock(env, LOCAL, "full")
     assert not env.lock.exists()
+    # unpin the base revision and it blocks too
+    edit(env, "systems.yaml", "base_revision: cdbee75f17c01a7cc42f958dc650907174af0554 # Hugging Face commit", "base_revision: null # Hugging Face commit")
+    assert "checkpoint.base_revision" in {b.split(" ")[0] for b in config.lock_blockers(LOCAL, config_dir=env.config_dir)}
     # fill the checkpoint in and it locks
     edit(env, "systems.yaml", "adapter: null # path or repo of the chosen adapter\n      epoch: null # which saved epoch won on dev\n      base_revision: null # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507", "adapter: kaggle/out/epoch-2\n      epoch: 2\n      base_revision: deadbeef")
     assert not config.lock_blockers(LOCAL, config_dir=env.config_dir)

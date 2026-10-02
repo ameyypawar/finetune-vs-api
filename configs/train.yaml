@@ -10,7 +10,7 @@ base_model:
   # Placeholder: pin the Hugging Face commit hash before the first run, so the adapter can
   # be traced to exactly the weights it was trained on. The Kaggle script refuses to run
   # while this is null.
-  revision: null
+  revision: cdbee75f17c01a7cc42f958dc650907174af0554
 
 lora:
   r: 16

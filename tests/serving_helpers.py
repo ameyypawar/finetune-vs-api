@@ -6,6 +6,7 @@ serving script. Nothing here touches the network beyond 127.0.0.1, or a GPU, or 
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import threading
@@ -274,14 +275,22 @@ class Lab:
         assert old in text, f"{old!r} not in {filename}"
         path.write_text(text.replace(old, new, 1))
 
+    def edit_re(self, filename: str, pattern: str, repl: str) -> None:
+        """Replace every match of `pattern`; at least one must exist."""
+        path = self.config_dir / filename
+        text, n = re.subn(pattern, repl, path.read_text())
+        assert n, f"{pattern!r} not in {filename}"
+        path.write_text(text)
+
     def pin_revision(self, revision: str) -> None:
-        self.edit("train.yaml", "revision: null", f"revision: {revision}")
+        """Set the base-model revision in train.yaml, whatever it is now (pinned or null)."""
+        self.edit_re("train.yaml", r"(?m)^(\s*revision: )\S+", rf"\g<1>{revision}")
 
     def pin_checkpoint(self, epoch: int = 2, revision: str = REVISION) -> None:
         """What the user does after dev-select: fill the two checkpoint blocks in systems.yaml."""
-        self.edit("systems.yaml", "adapter: null # path or repo of the chosen adapter\n      epoch: null # which saved epoch won on dev\n      base_revision: null # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507",
-                  f"adapter: adapters/epoch-{epoch}\n      epoch: {epoch}\n      base_revision: {revision}")
-        self.edit("systems.yaml", "    checkpoint:\n      base_revision: null", f"    checkpoint:\n      base_revision: {revision}")
+        self.edit("systems.yaml", "adapter: null # path or repo of the chosen adapter\n      epoch: null # which saved epoch won on dev\n",
+                  f"adapter: adapters/epoch-{epoch}\n      epoch: {epoch}\n")
+        self.edit_re("systems.yaml", r"(?m)^(      base_revision: )\S+", rf"\g<1>{revision}")  # both local rows
 
     def lock_all(self, subsets=LOCKED_SUBSETS, systems=(FT, BASE)) -> None:
         for system in systems:

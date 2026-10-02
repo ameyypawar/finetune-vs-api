@@ -547,8 +547,13 @@ def test_without_a_log_the_card_says_these_are_planned_settings(standard, tmp_pa
     repo.render("card")
     card = repo.read("hf/README.md")
     assert "No training run has finished yet. These are the planned settings from `configs/train.yaml`" in card
-    assert "revision not pinned yet" in card and "rank 16, alpha 32" in card
+    assert "revision `cdbee75f17c01a7cc42f958dc650907174af0554`" in card and "rank 16, alpha 32" in card
     assert "Hardware:" not in card and "Final training loss" not in card
+    # with the revision unpinned, the card says so rather than showing a value
+    train = repo.path("configs/train.yaml")
+    train.write_text(re.sub(r"(?m)^(\s*revision: )\S+", r"\g<1>null", train.read_text()))
+    repo.render("card")
+    assert "revision not pinned yet" in repo.read("hf/README.md")
 
 
 def test_a_pinned_adapter_replaces_the_placeholder(standard, tmp_path):

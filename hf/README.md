@@ -91,7 +91,7 @@ The adapter location above is a placeholder until the adapter is published.
 
 No training run has finished yet. These are the planned settings from `configs/train.yaml`, not the record of a run.
 
-- Base model: `Qwen/Qwen3-4B-Instruct-2507`, revision not pinned yet.
+- Base model: `Qwen/Qwen3-4B-Instruct-2507`, revision `cdbee75f17c01a7cc42f958dc650907174af0554`.
 - Method: LoRA with rank 16, alpha 32 and dropout 0.0, on q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj; the base weights were quantized while training (`load_in_4bit`, QLoRA).
 - Data: the train split of MASSIVE (11,514 requests) with its human labels, converted to chat records. Labels never come from an API model.
 - Optimisation: learning rate 0.0002, linear schedule with warmup ratio 0.03, weight decay 0.01, optimizer adamw_8bit, 2 epochs, batch size 8 with 2 gradient accumulation steps, maximum sequence length 512, seed 3407.

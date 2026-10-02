@@ -63,7 +63,7 @@ systems:
     checkpoint:
       adapter: null # path or repo of the chosen adapter
       epoch: null # which saved epoch won on dev
-      base_revision: null # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507
+      base_revision: cdbee75f17c01a7cc42f958dc650907174af0554 # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507
     params:
       temperature: 0
       max_tokens: 256
@@ -78,7 +78,7 @@ systems:
     test_subset: full
     price_id: null
     checkpoint:
-      base_revision: null
+      base_revision: cdbee75f17c01a7cc42f958dc650907174af0554
     params:
       temperature: 0
       max_tokens: 256

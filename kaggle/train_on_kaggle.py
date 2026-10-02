@@ -57,7 +57,7 @@ os.environ.setdefault("WANDB_DISABLED", "true")
 BASE_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
 #: Hugging Face commit hash of BASE_MODEL. Placeholder: pin it (here and in configs/train.yaml)
 #: before the first run, so the adapter can be traced to the exact weights it was trained on.
-BASE_REVISION: str | None = None
+BASE_REVISION: str | None = "cdbee75f17c01a7cc42f958dc650907174af0554"
 
 LORA_R = 16
 LORA_ALPHA = 32
