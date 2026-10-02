@@ -7,12 +7,22 @@ them.
 
 ## What is compared
 
-Five systems answer the same request, turning it into one JSON function call (an intent and a list of
+Six systems answer the same request, turning it into one JSON function call (an intent and a list of
 slots), on the English part of MASSIVE 1.1: the LoRA fine-tune `ft-qwen3-4b-lora`, the untuned base
-model with retrieved examples `base-qwen3-4b-k10`, and three API models on free tiers,
-`gh-gpt-4.1-mini-k10`, `gh-gpt-4.1-k10` and `groq-gpt-oss-120b-k10`. `configs/systems.yaml` defines
-each one: endpoint, model, prompt, decoding. The fine-tune is the reference: every other system is
-compared with it.
+model with retrieved examples `base-qwen3-4b-k10`, and four API models on free tiers:
+`groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10` and `groq-qwen3.8-27b-k10` on Groq, and
+`gemini-3.8-flash-k10` on Google AI Studio. `configs/systems.yaml` defines each one: endpoint, model,
+prompt, decoding. The fine-tune is the reference: every other system is compared with it.
+
+## Changes to the plan
+
+- **2026-10-02.** Before any dev or test evaluation request had been sent, the two GitHub Models rows
+  (`gh-gpt-4.1-mini-k10` and `gh-gpt-4.1-k10`, openai/gpt-4.1-mini and openai/gpt-4.1) were replaced
+  by `groq-gpt-oss-20b-k10` and `groq-qwen3.8-27b-k10` on Groq and `gemini-3.8-flash-k10` on Google AI
+  Studio's free tier. GitHub Models stopped taking new customers on 2026-06-16
+  (<https://github.blog/changelog/2026-06-16-github-models-is-no-longer-available-to-new-customers/>)
+  and was retired on 2026-07-30 (<https://www.developersdigest.tech/blog/github-models-retired-2026>);
+  on 2026-10-02 its inference and catalog URLs answered a plain "OK" to every request.
 
 ## Metrics
 
@@ -55,8 +65,8 @@ is scored on a fixed, seeded, scenario-stratified subset (`src/finetune_vs_api/s
 
 - **S500**: 500 items of the test split, stratified by MASSIVE's 18 scenarios with proportional
   allocation and a floor of 5 per scenario. This is the headline subset.
-- **S300**: 300 items, drawn from inside S500 with the same floor. `gh-gpt-4.1-k10` runs on it; the free tier
-  it uses has the lowest daily request cap in `configs/systems.yaml`.
+- **S300**: 300 items, drawn from inside S500 with the same floor. It is pre-registered, committed in
+  `results/subsets.json` with its hash, but no row uses it now: every API row runs on S500.
 - **full**: the whole test split (2,974 items). It is a secondary column, for the self-hosted rows only,
   which have no request cap.
 
@@ -109,6 +119,9 @@ apply, the cost is a pair of bounds, per 1,000 calls (`src/finetune_vs_api/cost.
 - **no caching**: every prompt token at the full input price;
 - **cached prefix**: the static part of the prompt (the system message, identical for every request) at the
   cached input price.
+
+A price entry with no cached input price (qwen3.8-27b on Groq lists none) gets no caching discount, so
+its two bounds are equal.
 
 **Self-hosted rows** are priced as a rented GPU: the on-demand hourly price of the `aws-g4dn.xlarge` entry (one
 T4), divided by the requests per second the throughput benchmark measured at the operating point. It is the
@@ -175,6 +188,9 @@ locking again.
   the same lowercased, trimmed, whitespace-collapsed text the metrics use.
 - The label inventory comes from the train split only, and the fine-tune is trained on MASSIVE's human labels
   only; no API output is ever a label.
+- Free-tier data use. Google may use content sent on its free tier to improve its products. Only public MASSIVE
+  text is sent to any API: the requests, and in the few-shot prompts the label lists and train examples taken
+  from MASSIVE.
 
 ## What the scripts read and write
 

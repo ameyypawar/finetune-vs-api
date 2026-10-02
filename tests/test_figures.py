@@ -14,7 +14,7 @@ from PIL import Image
 
 from conftest import SCRIPTS, load_script
 from finetune_vs_api import config
-from results_fixtures import BASE, FT, FULLER, GROQ, MINI, Lab
+from results_fixtures import API_SYSTEMS, BASE, FT, GEMINI, GPT_OSS_20B, GPT_OSS_120B, QWEN_27B, Lab
 
 compare = load_script("compare")
 figures = load_script("make_figures")
@@ -99,13 +99,27 @@ def test_every_point_is_where_the_comparison_puts_it(world):
     by_name = {s["name"]: s for s in doc["systems"]}
     ft = by_name[FT]
     assert (round(ft["cost"]["per_1k_calls_usd"], 12), round(ft["metrics"]["exact_match"]["value"], 12), figures.SELF_HOSTED) in drawn
-    for name in (MINI, FULLER, GROQ):
+    for name in (GPT_OSS_20B, GPT_OSS_120B, GEMINI):
         s = by_name[name]
         y = round(s["metrics"]["exact_match"]["value"], 12)
         bounds = s["cost"]["per_1k_calls_usd"]
         assert (round(bounds["upper"], 12), y, figures.API) in drawn  # filled: no caching
         assert (round(bounds["lower"], 12), y, figures.SURFACE) in drawn  # hollow: cached prefix
-    assert len(drawn) == 1 + 3 * 2
+    qwen = by_name[QWEN_27B]  # no cached-input price: one point, drawn filled
+    assert (round(qwen["cost"]["per_1k_calls_usd"]["upper"], 12), round(qwen["metrics"]["exact_match"]["value"], 12), figures.API) in drawn
+    assert len(drawn) == 1 + 3 * 2 + 1
+
+
+def test_a_price_without_a_cached_rate_is_one_filled_point_and_no_hollow_end(world):
+    """groq-qwen3.8-27b has no cached-input price, so its two cost bounds are equal."""
+    _, doc, _ = world
+    fig = figures.plot_accuracy_vs_cost(doc)
+    qwen = next(s for s in doc["systems"] if s["name"] == QWEN_27B)
+    bounds = qwen["cost"]["per_1k_calls_usd"]
+    assert bounds["lower"] == bounds["upper"]
+    at_cost = [line for line in fig.axes[0].lines if round(line.get_xdata()[0], 12) == round(bounds["upper"], 12)]
+    assert [line.get_markerfacecolor() for line in at_cost] == [figures.API]  # filled only: nothing hollow underneath
+    assert QWEN_27B in texts(fig)
 
 
 def test_the_interval_bars_are_the_bootstrap_intervals(world):
@@ -136,8 +150,18 @@ def test_a_system_without_a_cost_is_left_out_and_named(world):
 def test_every_drawn_system_is_named_on_the_chart_not_only_by_colour(world):
     _, doc, _ = world
     labels = texts(figures.plot_accuracy_vs_cost(doc))
-    for name in (FT, MINI, GROQ, f"{FULLER} (S300)"):  # gpt-4.1's subset is part of its label
+    for name in (FT, *API_SYSTEMS):
         assert name in labels
+
+
+def test_a_system_on_a_smaller_subset_carries_it_in_its_label(world):
+    """No real row uses S300 now; the figure still names the subset of a row compared on a smaller one."""
+    _, doc, _ = world
+    smaller = copy.deepcopy(doc)
+    next(s for s in smaller["systems"] if s["name"] == GEMINI)["comparison_subset"] = "S300"
+    labels = texts(figures.plot_accuracy_vs_cost(smaller))
+    assert f"{GEMINI} (S300)" in labels and GEMINI not in labels
+    assert {FT, GPT_OSS_20B, GPT_OSS_120B, QWEN_27B} <= set(labels)
 
 
 def test_the_legend_explains_what_the_colours_and_the_ends_mean(world):
@@ -166,33 +190,40 @@ def test_points_that_nearly_coincide_still_get_labels_that_do_not_overlap(world)
     _, doc, _ = world
     crowded = copy.deepcopy(doc)
     by_name = {s["name"]: s for s in crowded["systems"]}
-    mini, groq = by_name[MINI], by_name[GROQ]
-    groq["metrics"]["exact_match"] = {"value": mini["metrics"]["exact_match"]["value"] + 0.002, "ci95": list(mini["metrics"]["exact_match"]["ci95"])}
-    groq["cost"]["per_1k_calls_usd"] = {k: v * 1.03 for k, v in mini["cost"]["per_1k_calls_usd"].items()}
+    small, large = by_name[GPT_OSS_20B], by_name[GPT_OSS_120B]
+    large["metrics"]["exact_match"] = {"value": small["metrics"]["exact_match"]["value"] + 0.002, "ci95": list(small["metrics"]["exact_match"]["ci95"])}
+    large["cost"]["per_1k_calls_usd"] = {k: v * 1.03 for k, v in small["cost"]["per_1k_calls_usd"].items()}
     fig = figures.plot_accuracy_vs_cost(crowded)
     renderer = _render(fig)
     boxes = {t.get_text(): t.get_window_extent(renderer) for t in fig.axes[0].texts}
-    assert {MINI, GROQ} <= set(boxes)
+    assert {GPT_OSS_20B, GPT_OSS_120B} <= set(boxes)
     names = list(boxes)
     for i, first in enumerate(names):
         for second in names[i + 1 :]:
             assert not boxes[first].overlaps(boxes[second]), (first, second)
 
 
-def test_a_realistic_crowd_of_api_points_gets_labels_clear_of_every_mark(world):
-    """Costs and accuracies like the real runs will have: three API ranges close together, one long name on the right."""
+@pytest.mark.parametrize("gemini_subset", ["S500", "S300"], ids=["every name plain", "one name carries its subset"])
+def test_a_realistic_crowd_of_api_points_gets_labels_clear_of_every_mark(world, gemini_subset):
+    """Costs and accuracies like the real runs will have: a 10-shot prompt of 1,000 to 1,500 tokens and 30 to
+    200 answer tokens a call, at the list prices in configs/sources.yaml. That puts four API marks in the middle
+    of the plot (a range where the price has a cached rate, one point where it has none), and a long name on
+    the right (the longest when it carries its subset)."""
     _, doc, _ = world
     crowd = copy.deepcopy(doc)
     by_name = {s["name"]: s for s in crowd["systems"]}
-    values = {  # exact match with its interval, and the cost (a range for an API)
+    values = {  # exact match with its interval, and the cost (a range for an API, one number for the GPU)
         FT: (0.908, (0.882, 0.932), 0.0099),
-        MINI: (0.848, (0.816, 0.878), {"lower": 0.301, "upper": 0.751}),
-        GROQ: (0.844, (0.812, 0.876), {"lower": 0.333, "upper": 0.445}),
-        FULLER: (0.870, (0.830, 0.907), {"lower": 1.51, "upper": 3.76}),
+        GPT_OSS_20B: (0.848, (0.816, 0.878), {"lower": 0.094, "upper": 0.128}),
+        GPT_OSS_120B: (0.844, (0.812, 0.876), {"lower": 0.188, "upper": 0.255}),
+        QWEN_27B: (0.878, (0.846, 0.907), {"lower": 0.891, "upper": 0.891}),  # no cached-input price: one point
+        GEMINI: (0.882, (0.850, 0.910), {"lower": 1.27, "upper": 1.88}),
     }
     for name, (em, interval, price) in values.items():
         by_name[name]["metrics"]["exact_match"] = {"value": em, "ci95": list(interval), "n": 500}
         by_name[name]["cost"]["per_1k_calls_usd"] = price
+    by_name[GEMINI]["comparison_subset"] = gemini_subset
+    gemini_label = GEMINI if gemini_subset == "S500" else f"{GEMINI} (S300)"
     fig = figures.plot_accuracy_vs_cost(crowd)
     renderer = _render(fig)
     ax = fig.axes[0]
@@ -205,7 +236,7 @@ def test_a_realistic_crowd_of_api_points_gets_labels_clear_of_every_mark(world):
         for (x0, y0), (x1, y1) in (ax.transData.transform(segment) for segment in collection.get_segments()):
             marks.append((min(x0, x1) - pad, min(y0, y1) - pad, max(x0, x1) + pad, max(y0, y1) + pad))
     labels = {t.get_text(): t.get_window_extent(renderer) for t in ax.texts}
-    assert set(labels) == {FT, MINI, GROQ, f"{FULLER} (S300)"}
+    assert set(labels) == {FT, GPT_OSS_20B, GPT_OSS_120B, QWEN_27B, gemini_label}
     inside = ax.bbox
     for name, box in labels.items():
         assert inside.x0 <= box.x0 and box.x1 <= inside.x1 and inside.y0 <= box.y0 and box.y1 <= inside.y1, f"{name} leaves the plot"
@@ -235,7 +266,7 @@ def test_nothing_is_clipped_by_the_edge_of_the_figure_and_nothing_collides(world
     note = next(t for t in fig.texts if t.get_text()).get_window_extent(renderer)
     assert not legend_box.overlaps(note)  # the note sits under the legend
     if draw == "plot_accuracy_vs_cost":  # the direct labels do not sit on each other
-        labels = [(t, b) for t, b in boxes if t in {FT, MINI, GROQ, f"{FULLER} (S300)"}]
+        labels = [(t, b) for t, b in boxes if t in {FT, *API_SYSTEMS}]
         for i, (_, a) in enumerate(labels):
             for _, b in labels[i + 1 :]:
                 assert not a.overlaps(b)
@@ -255,7 +286,7 @@ def test_the_latency_figure_shows_the_self_hosted_numbers_and_nothing_from_the_a
     assert [t.get_text() for t in fig.legends[0].get_texts()] == ["p50, concurrency 1", "p95, concurrency 1", "p95 at the operating point"]
     assert "ft-qwen3-4b-lora\noperating point: concurrency 8" in labels
     joined = " ".join(labels)
-    for api in (MINI, FULLER, GROQ):
+    for api in API_SYSTEMS:
         assert api not in joined
 
 
@@ -294,7 +325,7 @@ def test_an_api_only_set_of_results_still_draws_the_cost_figure(tmp_path, monkey
     monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
     monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
     lab = Lab(tmp_path)
-    lab.write_run(MINI)
+    lab.write_run(GPT_OSS_20B)
     lab.write_audit()
     compare.run(results_dir=lab.results, processed_dir=lab.processed, config_dir=lab.config_dir, n_resamples=50, out=lambda line: None)
     lines: list[str] = []

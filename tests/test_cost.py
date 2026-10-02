@@ -21,9 +21,10 @@ from finetune_vs_api.cost import (
     selfhost_per_1k,
 )
 
-# gpt-4.1 list prices, USD per million tokens
-GPT41 = Price(input_per_mtok=2.00, output_per_mtok=8.00, cached_input_per_mtok=0.50)
-MINI = Price(input_per_mtok=0.40, output_per_mtok=1.60, cached_input_per_mtok=0.10)
+# list prices from configs/sources.yaml, USD per million tokens
+GPT_OSS_120B = Price(input_per_mtok=0.15, output_per_mtok=0.60, cached_input_per_mtok=0.075)
+GPT_OSS_20B = Price(input_per_mtok=0.075, output_per_mtok=0.30, cached_input_per_mtok=0.037)
+QWEN_27B = Price(input_per_mtok=0.80, output_per_mtok=4.00)  # its page lists no cached-input price
 
 
 # --- one call --------------------------------------------------------------------------------
@@ -31,42 +32,42 @@ MINI = Price(input_per_mtok=0.40, output_per_mtok=1.60, cached_input_per_mtok=0.
 
 def test_cached_tokens_are_priced_at_the_cached_rate():
     usage = Usage(prompt_tokens=1000, cached_tokens=400, completion_tokens=200)
-    # 600 uncached * 2.00 + 400 cached * 0.50 + 200 output * 8.00, per million
-    assert api_call_cost(usage, GPT41) == pytest.approx((600 * 2.00 + 400 * 0.50 + 200 * 8.00) / 1e6)
-    assert api_call_cost(usage, GPT41) == pytest.approx(0.003)
+    # 600 uncached * 0.15 + 400 cached * 0.075 + 200 output * 0.60, per million
+    assert api_call_cost(usage, GPT_OSS_120B) == pytest.approx((600 * 0.15 + 400 * 0.075 + 200 * 0.60) / 1e6)
+    assert api_call_cost(usage, GPT_OSS_120B) == pytest.approx(0.00024)
 
 
 def test_no_cached_tokens_means_everything_is_uncached():
-    assert api_call_cost(Usage(prompt_tokens=1000, completion_tokens=200), GPT41) == pytest.approx(0.0036)
-    assert api_call_cost(Usage(1000, 200, cached_tokens=0), GPT41) == pytest.approx(0.0036)
+    assert api_call_cost(Usage(prompt_tokens=1000, completion_tokens=200), GPT_OSS_120B) == pytest.approx(0.00027)
+    assert api_call_cost(Usage(1000, 200, cached_tokens=0), GPT_OSS_120B) == pytest.approx(0.00027)
 
 
 def test_cached_tokens_cannot_exceed_the_prompt():
     usage = Usage(prompt_tokens=100, cached_tokens=900, completion_tokens=0)
-    assert api_call_cost(usage, GPT41) == pytest.approx(100 * 0.50 / 1e6)
+    assert api_call_cost(usage, GPT_OSS_120B) == pytest.approx(100 * 0.075 / 1e6)
 
 
 def test_a_provider_without_a_cached_rate_bills_cached_tokens_as_input():
-    flat = Price(input_per_mtok=1.0, output_per_mtok=2.0)
     usage = Usage(prompt_tokens=1000, cached_tokens=600, completion_tokens=100)
-    assert api_call_cost(usage, flat) == pytest.approx((1000 * 1.0 + 100 * 2.0) / 1e6)
+    assert api_call_cost(usage, QWEN_27B) == pytest.approx((1000 * 0.80 + 100 * 4.00) / 1e6)
+    assert api_call_cost(usage, QWEN_27B) == pytest.approx(0.0012)
 
 
 def test_reasoning_tokens_are_part_of_the_output_and_not_counted_twice():
     # completion_tokens already includes the 450 reasoning tokens
     usage = Usage(prompt_tokens=100, completion_tokens=500, reasoning_tokens=450)
-    assert api_call_cost(usage, MINI) == pytest.approx((100 * 0.40 + 500 * 1.60) / 1e6)
+    assert api_call_cost(usage, GPT_OSS_20B) == pytest.approx((100 * 0.075 + 500 * 0.30) / 1e6)
 
 
 def test_zero_tokens_cost_nothing():
-    assert api_call_cost(Usage(0, 0), GPT41) == 0.0
+    assert api_call_cost(Usage(0, 0), GPT_OSS_120B) == 0.0
 
 
 def test_a_call_without_token_counts_cannot_be_priced():
     with pytest.raises(ValueError, match="estimate"):
-        api_call_cost(Usage(reported=False), GPT41)
+        api_call_cost(Usage(reported=False), GPT_OSS_120B)
     with pytest.raises(ValueError):
-        api_call_cost(Usage(prompt_tokens=10), GPT41)
+        api_call_cost(Usage(prompt_tokens=10), GPT_OSS_120B)
 
 
 # --- bounds ----------------------------------------------------------------------------------
@@ -74,33 +75,32 @@ def test_a_call_without_token_counts_cannot_be_priced():
 
 def test_bounds_price_the_prefix_at_the_cached_rate_for_the_lower_bound():
     usage = Usage(prompt_tokens=2000, completion_tokens=100)
-    bounds = api_cost_bounds(usage, MINI, cacheable_prefix_tokens=1500)
-    assert bounds.upper == pytest.approx((2000 * 0.40 + 100 * 1.60) / 1e6)  # no caching
-    assert bounds.lower == pytest.approx((500 * 0.40 + 1500 * 0.10 + 100 * 1.60) / 1e6)
+    bounds = api_cost_bounds(usage, GPT_OSS_20B, cacheable_prefix_tokens=1500)
+    assert bounds.upper == pytest.approx((2000 * 0.075 + 100 * 0.30) / 1e6)  # no caching
+    assert bounds.lower == pytest.approx((500 * 0.075 + 1500 * 0.037 + 100 * 0.30) / 1e6)
     assert bounds.lower < bounds.upper
 
 
 def test_bounds_are_equal_without_a_prefix_or_without_a_cached_discount():
     usage = Usage(prompt_tokens=2000, completion_tokens=100)
-    assert api_cost_bounds(usage, MINI, 0).lower == api_cost_bounds(usage, MINI, 0).upper
-    flat = Price(1.0, 2.0)
-    assert api_cost_bounds(usage, flat, 1500).lower == api_cost_bounds(usage, flat, 1500).upper
+    assert api_cost_bounds(usage, GPT_OSS_20B, 0).lower == api_cost_bounds(usage, GPT_OSS_20B, 0).upper
+    assert api_cost_bounds(usage, QWEN_27B, 1500).lower == api_cost_bounds(usage, QWEN_27B, 1500).upper
 
 
 def test_a_prefix_longer_than_the_prompt_is_capped():
     usage = Usage(prompt_tokens=100, completion_tokens=0)
-    capped = api_cost_bounds(usage, MINI, cacheable_prefix_tokens=10_000)
-    assert capped.lower == pytest.approx(100 * 0.10 / 1e6)
+    capped = api_cost_bounds(usage, GPT_OSS_20B, cacheable_prefix_tokens=10_000)
+    assert capped.lower == pytest.approx(100 * 0.037 / 1e6)
 
 
 def test_bounds_do_not_depend_on_what_the_provider_reported_as_cached():
     base = Usage(prompt_tokens=2000, completion_tokens=100)
     reported = Usage(prompt_tokens=2000, completion_tokens=100, cached_tokens=1900)
-    assert api_cost_bounds(base, MINI, 1500) == api_cost_bounds(reported, MINI, 1500)
+    assert api_cost_bounds(base, GPT_OSS_20B, 1500) == api_cost_bounds(reported, GPT_OSS_20B, 1500)
 
 
 def test_bounds_fields_are_named_upper_then_lower():
-    assert api_cost_bounds(Usage(1000, 10), MINI, 500)._fields == ("upper", "lower")
+    assert api_cost_bounds(Usage(1000, 10), GPT_OSS_20B, 500)._fields == ("upper", "lower")
 
 
 # --- per 1,000 / self-host / break-even -------------------------------------------------------------
@@ -138,8 +138,9 @@ def test_breakeven_rejects_negative_costs():
 
 
 def test_price_from_a_sources_entry():
-    entry = {"usd_per_mtok": {"input": 0.40, "cached_input": 0.10, "output": 1.60}}
-    assert Price.from_entry(entry) == MINI
+    entry = {"usd_per_mtok": {"input": 0.075, "cached_input": 0.037, "output": 0.30}}
+    assert Price.from_entry(entry) == GPT_OSS_20B
+    assert Price.from_entry({"usd_per_mtok": {"input": 0.80, "output": 4.00}}) == QWEN_27B  # no cached_input key
     assert Price.from_entry({"usd_per_mtok": {"input": 1, "output": 2}}).cached == 1
 
 
@@ -172,7 +173,7 @@ def test_estimate_usage_with_no_output():
     usage = estimate_usage([{"role": "user", "content": "hi"}], None, counter=words)
     assert usage.completion_tokens == 0
     assert usage.estimate_method == "custom counter"
-    assert usage.is_complete and api_call_cost(usage, MINI) > 0
+    assert usage.is_complete and api_call_cost(usage, GPT_OSS_20B) > 0
 
 
 def test_default_counter_uses_tiktoken_o200k_when_it_loads(monkeypatch):
@@ -220,7 +221,7 @@ def test_cost_summary_totals_bounds_and_provenance():
         Usage(1000, 50, cached_tokens=0),
         estimate_usage([{"role": "user", "content": "x"}], "y", counter=words),
     ]
-    summary = cost_summary(usages, MINI, cacheable_prefix_tokens=500)
+    summary = cost_summary(usages, GPT_OSS_20B, cacheable_prefix_tokens=500)
     assert summary["billing_basis"] == BILLING_BASIS == "free tier; priced at paid list price"
     assert summary["calls"] == 3
     assert summary["calls_with_reported_usage"] == 2
@@ -232,4 +233,4 @@ def test_cost_summary_totals_bounds_and_provenance():
 
 def test_cost_summary_needs_calls():
     with pytest.raises(ValueError):
-        cost_summary([], MINI, 0)
+        cost_summary([], GPT_OSS_20B, 0)

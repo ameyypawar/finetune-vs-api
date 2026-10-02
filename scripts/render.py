@@ -63,7 +63,7 @@ API_LATENCY_LABEL = "observed on free tiers from India; not representative of pa
 #: The reference system when there is no comparison to name one; the same as scripts/compare.py (a test keeps them equal).
 DEFAULT_REFERENCE = "ft-qwen3-4b-lora"
 HUB_DATASET_ID = "AmazonScience/massive"  # the Hugging Face Hub id of MASSIVE, for the card's metadata
-ENDPOINT_NAMES = {"local": "a local server", "github-models": "GitHub Models", "groq": "Groq"}
+ENDPOINT_NAMES = {"local": "a local server", "groq": "Groq", "gemini": "Google AI Studio"}
 READING = {
     "system_beats_reference": "beats the fine-tune",
     "reference_beats_system": "the fine-tune beats it",

@@ -10,8 +10,9 @@ this sends ONE small request carrying this repository's real strict JSON schema 
     whether the answer was valid for the schema      latency
 
 If the strict schema is rejected (HTTP 400 or 422) one plain request follows, so the other
-facts are still recorded. Nothing is retried: a probe must not burn quota. For GitHub Models
-it also lists the model catalog with each model's tier.
+facts are still recorded. Nothing is retried: a probe must not burn quota. For an endpoint with
+a `catalog_url` in configs/systems.yaml it also lists the model catalog with each model's tier
+(no endpoint has one now).
 
 Results go to results/free_tiers/<endpoint>.json, merged by model, so a later run keeps the
 entries it did not re-check. Use them to confirm configs/systems.yaml and to fill the
@@ -127,15 +128,17 @@ async def check_model(
     }
     attempts = [await probe_once(probe, messages, fmt, inventory, transport, environ)]
     first = attempts[0]
-    if first["status"] == 200:
+    if first["status"] == 200 and first.get("error") is None:
         entry["strict_json_schema_accepted"] = True
-    elif first["status"] in SCHEMA_REJECTED:
-        entry["strict_json_schema_accepted"] = False
+    elif first["status"] in SCHEMA_REJECTED or first["status"] == 200:
+        # Rejected outright (False), or a 200 that is not a chat completion (None: no verdict). Either
+        # way one plain request follows, so the other facts are still recorded.
+        entry["strict_json_schema_accepted"] = False if first["status"] in SCHEMA_REJECTED else None
         plain = dataclasses.replace(probe, supports_json_schema=False)
         attempts.append(await probe_once(plain, messages, None, inventory, transport, environ))
     else:
         entry["strict_json_schema_accepted"] = None  # no verdict: auth, quota, outage or missing model
-    answered = next((a for a in attempts if a["status"] == 200), None)
+    answered = next((a for a in attempts if a["status"] == 200 and a.get("error") is None), None)
     entry["attempts"] = attempts
     entry["answered"] = answered is not None
     if answered:

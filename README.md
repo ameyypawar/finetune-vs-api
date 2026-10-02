@@ -17,8 +17,10 @@ test lock, API client and evaluation runner exist and are tested against stubs. 
 training script, and the Kaggle script that serves the model, picks the checkpoint on dev, runs
 the locked test and measures throughput (`kaggle/serve/`), are written but have not been run. The
 comparison, the figures and the generated docs (`scripts/compare.py`, `make_figures.py`,
-`render.py`) are tested on synthetic results only. No model has been trained, no API has been
-called, and nothing below the "Results" heading has been produced.
+`render.py`) are tested on synthetic results only. The three Groq rows have been probed
+(`results/free_tiers/`), piloted on 50 dev items each (`results/runs/*__dev/`) and locked for the
+test split (`results/test_lock.jsonl`). No test request has been sent, no model has been trained,
+and nothing below the "Results" heading has been produced.
 
 ## What will be compared
 
@@ -26,9 +28,10 @@ called, and nothing below the "Results" heading has been produced.
 |---|---|---|---|
 | `ft-qwen3-4b-lora` | Qwen3-4B-Instruct-2507 + LoRA adapter | `finetuned_v1` | local server |
 | `base-qwen3-4b-k10` | Qwen3-4B-Instruct-2507 | `fewshot_k10_v1` | local server |
-| `gh-gpt-4.1-mini-k10` | openai/gpt-4.1-mini | `fewshot_k10_v1` | GitHub Models, free tier |
-| `gh-gpt-4.1-k10` | openai/gpt-4.1 | `fewshot_k10_v1` | GitHub Models, free tier |
+| `groq-gpt-oss-20b-k10` | openai/gpt-oss-20b | `fewshot_k10_v1` | Groq, free tier |
 | `groq-gpt-oss-120b-k10` | openai/gpt-oss-120b | `fewshot_k10_v1` | Groq, free tier |
+| `groq-qwen3.8-27b-k10` | qwen/qwen3.8-27b | `fewshot_k10_v1` | Groq, free tier |
+| `gemini-3.8-flash-k10` | gemini-3.8-flash | `fewshot_k10_v1` | Google AI Studio, free tier |
 
 `fewshot_k10_v1` shows the model the 10 most similar training examples (embedding search with
 `BAAI/bge-small-en-v1.5`, over the train split only). The fine-tune is trained on MASSIVE's
@@ -84,12 +87,12 @@ To bring your own OpenAI fine-tuning file, run `scripts/validate_chat_jsonl.py` 
 accepts single-turn `{"messages": [system?, user, assistant]}` records and reports tools,
 multimodal parts, weights and multi-turn records as unsupported in this version.
 
-Running an evaluation needs an endpoint, which nothing in this repository has contacted yet:
+Running an evaluation needs an endpoint and its key:
 
 ```bash
 cp .env.example .env                 # then fill in the keys you have
 python scripts/check_free_tiers.py --dry-run
-python scripts/run_eval.py --system gh-gpt-4.1-mini-k10 --split dev --subset D50
+python scripts/run_eval.py --system groq-gpt-oss-20b-k10 --split dev --subset D50
 ```
 
 ## Know your data

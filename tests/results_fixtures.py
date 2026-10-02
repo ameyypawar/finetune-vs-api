@@ -25,18 +25,22 @@ from finetune_vs_api.schema import target_json
 
 FT = "ft-qwen3-4b-lora"
 BASE = "base-qwen3-4b-k10"
-MINI = "gh-gpt-4.1-mini-k10"
-FULLER = "gh-gpt-4.1-k10"
-GROQ = "groq-gpt-oss-120b-k10"
-SYSTEMS = (FT, BASE, MINI, FULLER, GROQ)
+GPT_OSS_20B = "groq-gpt-oss-20b-k10"
+GPT_OSS_120B = "groq-gpt-oss-120b-k10"
+QWEN_27B = "groq-qwen3.8-27b-k10"
+GEMINI = "gemini-3.8-flash-k10"
+API_SYSTEMS = (GPT_OSS_20B, GPT_OSS_120B, QWEN_27B, GEMINI)
+SYSTEMS = (FT, BASE, *API_SYSTEMS)  # the order of configs/systems.yaml
 
 #: USD per million tokens. Round numbers: a call of 1,000 prompt tokens (800 of them the static
 #: prefix) and 100 completion tokens costs exactly 0.0012 (no caching) and 0.0006 (prefix cached)
-#: on gpt-4.1-mini.
+#: on groq-gpt-oss-20b. groq-qwen3.8-27b has no cached-input price, as in configs/sources.yaml, so
+#: its two bounds are equal (0.0024).
 ROUND_PRICES = {
-    "openai-gpt-4.1-mini": {"input": 1.0, "cached_input": 0.25, "output": 2.0},
-    "openai-gpt-4.1": {"input": 4.0, "cached_input": 1.0, "output": 8.0},
+    "groq-gpt-oss-20b": {"input": 1.0, "cached_input": 0.25, "output": 2.0},
     "groq-gpt-oss-120b": {"input": 0.5, "cached_input": 0.25, "output": 1.0},
+    "groq-qwen3.8-27b": {"input": 2.0, "output": 4.0},
+    "google-gemini-3.8-flash": {"input": 1.0, "cached_input": 0.5, "output": 4.0},
 }
 GPU_ON_DEMAND = 0.5  # USD per hour
 USAGE = (1000, 100)  # prompt tokens, completion tokens per call
@@ -81,6 +85,20 @@ class Lab:
         self.by_id = {e.id: e for e in self.test}
         self.all_ids = [e.id for e in sorted(self.test, key=lambda e: subsets.id_sort_key(e.id))]
         self.wrong: dict[str, set[str]] = {}
+
+    # --- the configs -----------------------------------------------------------------------------
+
+    def move_to_subset(self, system: str, subset: str) -> None:
+        """Point `system` at another test subset in this lab's copy of configs/systems.yaml.
+
+        Every API row in the real configs runs on S500; S300 is pre-registered in results/subsets.json
+        and no row uses it. This is how a test gets a row that is compared on a smaller subset than the
+        headline one, the case the comparison, the figure labels and the write-up notes still handle.
+        """
+        path = self.config_dir / "systems.yaml"
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        doc["systems"][system]["test_subset"] = subset
+        path.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
 
     # --- the data ------------------------------------------------------------------------------
 
@@ -214,19 +232,22 @@ class Lab:
     # --- the standard set of results -------------------------------------------------------------
 
     def populate(self) -> Lab:
-        """Test runs for all five systems, the audit, and a benchmark for the fine-tune.
+        """Test runs for all six systems, the audit, and a benchmark for the fine-tune.
 
         Which items each system gets wrong follows its position k in the sorted test ids:
-        ft k % 10 == 0, base k % 5 in (0, 1), mini k % 10 == 0 or k % 7 == 0, gpt-4.1 k % 20 == 0,
-        gpt-oss k % 4 == 0. Exposed as `lab.wrong[system]`.
+        ft k % 10 == 0, base k % 5 in (0, 1), gpt-oss-20b k % 10 == 0 or k % 7 == 0, gpt-oss-120b
+        k % 4 == 0, qwen3.8-27b k % 10 == 5 (as many errors as the fine-tune, on other items, so the
+        two are level) and gemini k % 20 == 0 (a subset of the fine-tune's errors, so it is ahead).
+        Exposed as `lab.wrong[system]`.
         """
         position = {item_id: k for k, item_id in enumerate(self.all_ids)}
         rules: dict[str, Callable[[int], bool]] = {
             FT: lambda k: k % 10 == 0,
             BASE: lambda k: k % 5 in (0, 1),
-            MINI: lambda k: k % 10 == 0 or k % 7 == 0,
-            FULLER: lambda k: k % 20 == 0,
-            GROQ: lambda k: k % 4 == 0,
+            GPT_OSS_20B: lambda k: k % 10 == 0 or k % 7 == 0,
+            GPT_OSS_120B: lambda k: k % 4 == 0,
+            QWEN_27B: lambda k: k % 10 == 5,
+            GEMINI: lambda k: k % 20 == 0,
         }
         for system, rule in rules.items():
             spec = config.resolve_system(system, self.config_dir)

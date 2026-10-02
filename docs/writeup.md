@@ -6,13 +6,14 @@ Can a LoRA fine-tune of a small open model match API models on a narrow, well-sp
 
 ## The setup
 
-The comparison has 5 systems:
+The comparison has 6 systems:
 
 - `ft-qwen3-4b-lora`: Qwen/Qwen3-4B-Instruct-2507 plus the LoRA adapter, prompt `finetuned_v1` (one-line instruction), self-hosted.
 - `base-qwen3-4b-k10`: Qwen/Qwen3-4B-Instruct-2507, prompt `fewshot_k10_v1` (10 retrieved examples), self-hosted.
-- `gh-gpt-4.1-mini-k10`: openai/gpt-4.1-mini, prompt `fewshot_k10_v1` (10 retrieved examples), GitHub Models, free tier.
-- `gh-gpt-4.1-k10`: openai/gpt-4.1, prompt `fewshot_k10_v1` (10 retrieved examples), GitHub Models, free tier.
+- `groq-gpt-oss-20b-k10`: openai/gpt-oss-20b, prompt `fewshot_k10_v1` (10 retrieved examples), Groq, free tier.
 - `groq-gpt-oss-120b-k10`: openai/gpt-oss-120b, prompt `fewshot_k10_v1` (10 retrieved examples), Groq, free tier.
+- `groq-qwen3.8-27b-k10`: qwen/qwen3.8-27b, prompt `fewshot_k10_v1` (10 retrieved examples), Groq, free tier.
+- `gemini-3.8-flash-k10`: gemini-3.8-flash, prompt `fewshot_k10_v1` (10 retrieved examples), Google AI Studio, free tier.
 
 The fine-tune is a LoRA adapter (rank 16, alpha 32, 2 epochs, as planned: no training run has finished yet) fitted to the human-labelled train split only; no API output is a label. The API systems run on free tiers with daily request caps, so every system is scored on a fixed, seeded test subset, stratified by scenario: S500 (500 items), S300 (300 items, inside S500). Each system's configuration must be locked, with a reason, before the runner will touch the test split. No money is spent on the API systems: their costs are computed at paid list prices.
 

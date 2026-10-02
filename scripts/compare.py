@@ -14,9 +14,9 @@ except the test labels, which nothing can be scored without:
 
 What it computes (definitions in docs/method.md):
 
-    pairing    every system is scored on its own test subset: S500, and S300 for gpt-4.1. A row that
-               ran on the full test split is compared on S500, and also scored on the full split
-               as a secondary column.
+    pairing    every system is scored on its own test subset: S500 for every API row (S300 is
+               pre-registered, but no row uses it now). A row that ran on the full test split is
+               compared on S500, and also scored on the full split as a secondary column.
     accuracy   exact match with 95% bootstrap intervals; the difference against the reference
                (system minus reference) with a paired-bootstrap interval and an exact McNemar test;
                exact match on the test items whose text never occurs in train; exact match per

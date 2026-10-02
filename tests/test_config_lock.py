@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
@@ -13,9 +14,10 @@ from conftest import ROOT, build_processed, load_script
 from finetune_vs_api import config, prompts
 from finetune_vs_api.config import ConfigError, LockError
 
-API = "gh-gpt-4.1-mini-k10"  # test subset S500, price openai-gpt-4.1-mini, no checkpoint block
-OTHER_API = "gh-gpt-4.1-k10"  # test subset S300
+API = "groq-gpt-oss-20b-k10"  # test subset S500, price groq-gpt-oss-20b, no checkpoint block
+OTHER_API = "groq-gpt-oss-120b-k10"  # the same endpoint, prompt and limits as API, with another model and price
 LOCAL = "ft-qwen3-4b-lora"
+API_ROWS = ["groq-gpt-oss-20b-k10", "groq-gpt-oss-120b-k10", "groq-qwen3.8-27b-k10", "gemini-3.8-flash-k10"]
 
 
 @pytest.fixture
@@ -38,11 +40,26 @@ def env(tmp_path, monkeypatch):
     return e
 
 
-def edit(env, filename, old, new):
+def header(name):
+    """The header line of an entry of systems.yaml (a row) or sources.yaml (a price), for `edit`."""
+    return f"  {name}:"
+
+
+def edit(env, filename, old, new, entry=None):
+    """Replace the first `old` with `new` in this test's copy of a config file.
+
+    The API rows are near-identical, so an edit that has to land in one of them names it with `entry`, the
+    header line of its YAML block (see `header`), and is made inside that block only.
+    """
     path = env.config_dir / filename
     text = path.read_text()
-    assert old in text, f"{old!r} not in {filename}"
-    path.write_text(text.replace(old, new, 1))
+    start, end = 0, len(text)
+    if entry is not None:
+        block = re.search(rf"^{re.escape(entry)}\n(?:(?: {{3,}}.*)?\n)*", text, re.MULTILINE)  # the header, then what is indented under it
+        assert block, f"{entry!r} not in {filename}"
+        start, end = block.span()
+    assert old in text[start:end], f"{old!r} not in {entry or filename}"
+    path.write_text(text[:start] + text[start:end].replace(old, new, 1) + text[end:])
 
 
 def lock(env, system=API, subset=None, reason="freeze before first test run", **extra):
@@ -58,27 +75,33 @@ def allowed(env, system=API, subset=None):
 
 def test_resolve_system_merges_the_endpoint_and_the_row(env):
     spec = config.resolve_system(API, env.config_dir)
-    assert spec["base_url"] == "https://models.github.ai/inference"
-    assert spec["api_key_env"] == "GITHUB_MODELS_TOKEN"
-    assert spec["model"] == "openai/gpt-4.1-mini"
-    assert spec["limits"]["rpm"] == 15 and spec["test_subset"] == "S500"
-    assert spec["supports_json_schema"] is False and spec["reasoning_in_completion"] is True
+    assert spec["base_url"] == "https://api.groq.com/openai/v1"
+    assert spec["api_key_env"] == "GROQ_API_KEY"
+    assert spec["model"] == "openai/gpt-oss-20b"
+    assert spec["limits"]["rpm"] == 30 and spec["test_subset"] == "S500"
+    assert spec["supports_json_schema"] is True and spec["reasoning_in_completion"] is True  # both from the endpoint
+    gemini = config.resolve_system("gemini-3.8-flash-k10", env.config_dir)  # another endpoint, merged the same way
+    assert gemini["base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert gemini["api_key_env"] == "GEMINI_API_KEY" and gemini["supports_json_schema"] is False
 
 
 @pytest.mark.parametrize(
-    ("old", "new", "fragment"),
+    ("system", "old", "new", "fragment"),
     [
-        ("endpoint: github-models\n    model: openai/gpt-4.1-mini", "endpoint: nowhere\n    model: openai/gpt-4.1-mini", "unknown endpoint"),
-        ("prompt: fewshot_k10_v1\n    dev_prompts: [zeroshot_v1]\n    test_subset: S500", "prompt: nope_v9\n    dev_prompts: [zeroshot_v1]\n    test_subset: S500", "unknown prompt"),
-        ("test_subset: S500\n    price_id: openai-gpt-4.1-mini", "test_subset: D100\n    price_id: openai-gpt-4.1-mini", "test_subset must be"),
-        ("    price_id: openai-gpt-4.1-mini\n", "", "price_id"),
-        ("max_tokens: 256\n    drop_params: []\n    limits:\n      rpm: 15", "max_tokens: 9000\n    drop_params: []\n    limits:\n      rpm: 15", "cap is 4000"),
+        (API, "endpoint: groq", "endpoint: nowhere", "unknown endpoint"),
+        (API, "prompt: fewshot_k10_v1", "prompt: nope_v9", "unknown prompt"),
+        (API, "test_subset: S500", "test_subset: D100", "test_subset must be"),
+        (API, "    price_id: groq-gpt-oss-20b\n", "", "price_id"),
+        # a documented output cap is enforced against what the row asks for: max_completion_tokens here, max_tokens below
+        (API, "    limits:\n", "    limits:\n      max_output_tokens: 512\n", "cap is 512"),
+        (LOCAL, "    limits:\n", "    limits:\n      max_output_tokens: 128\n", "cap is 128"),
     ],
+    ids=["unknown endpoint", "unknown prompt", "dev subset", "no price_id", "cap under max_completion_tokens", "cap under max_tokens"],
 )
-def test_bad_rows_are_rejected_with_a_clear_message(env, old, new, fragment):
-    edit(env, "systems.yaml", old, new)
+def test_bad_rows_are_rejected_with_a_clear_message(env, system, old, new, fragment):
+    edit(env, "systems.yaml", old, new, entry=header(system))
     with pytest.raises(ConfigError, match=fragment):
-        config.resolve_system(API, env.config_dir)
+        config.resolve_system(system, env.config_dir)
 
 
 def test_unknown_system(env):
@@ -105,27 +128,34 @@ def test_hash_is_stable_and_covers_the_documented_parts(env):
     assert config.config_hash(API, **env.ckw) != config.config_hash(OTHER_API, **env.ckw)
 
 
+def test_every_api_row_has_its_own_hash(env):
+    """Two rows on one endpoint differ in model and price; the row on another endpoint differs in its endpoint too."""
+    hashes = {name: config.config_hash(name, **env.ckw) for name in API_ROWS}
+    assert len(set(hashes.values())) == len(API_ROWS)
+    assert components(env, "gemini-3.8-flash-k10")["system"] != components(env, API)["system"]
+
+
 def test_changing_a_decoding_parameter_changes_only_decoding(env):
     before = components(env)
-    edit(env, "systems.yaml", "gh-gpt-4.1-mini-k10:\n    endpoint: github-models\n    model: openai/gpt-4.1-mini\n    tier: low\n    prompt: fewshot_k10_v1\n    dev_prompts: [zeroshot_v1]\n    test_subset: S500\n    price_id: openai-gpt-4.1-mini\n    params:\n      temperature: 0", "gh-gpt-4.1-mini-k10:\n    endpoint: github-models\n    model: openai/gpt-4.1-mini\n    tier: low\n    prompt: fewshot_k10_v1\n    dev_prompts: [zeroshot_v1]\n    test_subset: S500\n    price_id: openai-gpt-4.1-mini\n    params:\n      temperature: 0.7")
+    edit(env, "systems.yaml", "      temperature: 0\n", "      temperature: 0.7\n", entry=header(API))
     assert changed(before, components(env)) == ["decoding"]
 
 
 def test_changing_the_model_changes_the_system_component(env):
     before = components(env)
-    edit(env, "systems.yaml", "model: openai/gpt-4.1-mini", "model: openai/gpt-4.1-mini-2099")
+    edit(env, "systems.yaml", "model: openai/gpt-oss-20b", "model: openai/gpt-oss-20b-2099", entry=header(API))
     assert changed(before, components(env)) == ["system"]
 
 
 def test_changing_a_price_changes_only_prices(env):
     before = components(env)
-    edit(env, "sources.yaml", "      input: 0.40\n      cached_input: 0.10", "      input: 0.41\n      cached_input: 0.10")
+    edit(env, "sources.yaml", "      input: 0.075\n      cached_input: 0.037", "      input: 0.076\n      cached_input: 0.037", entry=header("groq-gpt-oss-20b"))
     assert changed(before, components(env)) == ["prices"]
 
 
 def test_a_price_for_another_system_does_not_matter(env):
     before = components(env)
-    edit(env, "sources.yaml", "      input: 2.00", "      input: 2.50")  # openai-gpt-4.1, not the mini
+    edit(env, "sources.yaml", "      input: 0.15\n", "      input: 0.16\n", entry=header("groq-gpt-oss-120b"))  # the 120b price, not the 20b's
     assert components(env) == before
 
 
@@ -160,14 +190,15 @@ def test_the_checkpoint_is_part_of_the_hash(env):
 
 def test_rate_limits_and_concurrency_are_not_part_of_the_hash(env):
     before = components(env)
-    edit(env, "systems.yaml", "      rpm: 15\n      rpd: 150\n      max_concurrency: 2", "      rpm: 12\n      rpd: 100\n      max_concurrency: 1")
+    edit(env, "systems.yaml", "      rpm: 30\n      rpd: 1000\n      tpm: 8000\n      tpd: 200000", "      rpm: 12\n      rpd: 100\n      tpm: 4000\n      tpd: 100000\n      max_concurrency: 1", entry=header(API))
     assert components(env) == before
 
 
 def test_max_input_tokens_is_part_of_the_hash_because_it_changes_what_is_sent(env):
+    edit(env, "systems.yaml", "    limits:\n", "    limits:\n      max_input_tokens: 8000\n", entry=header(API))  # no row sets one now
     before = components(env)
-    edit(env, "systems.yaml", "max_input_tokens: 8000", "max_input_tokens: 7000")
-    assert "system" in changed(before, components(env))
+    edit(env, "systems.yaml", "max_input_tokens: 8000", "max_input_tokens: 7000", entry=header(API))
+    assert changed(before, components(env)) == ["system"]
 
 
 # --- writing and checking a lock --------------------------------------------------------------------
@@ -198,7 +229,7 @@ def test_the_lock_is_per_system(env):
     with pytest.raises(LockError, match="never been locked"):
         allowed(env, OTHER_API)
     lock(env, OTHER_API)
-    edit(env, "systems.yaml", "temperature: 0\n      max_tokens: 256\n    drop_params: []\n    limits:\n      rpm: 10", "temperature: 0.5\n      max_tokens: 256\n    drop_params: []\n    limits:\n      rpm: 10")
+    edit(env, "systems.yaml", "      temperature: 0\n", "      temperature: 0.5\n", entry=header(OTHER_API))
     with pytest.raises(LockError, match="changed since"):
         allowed(env, OTHER_API)
     assert allowed(env, API)  # the other system's change does not touch this lock
@@ -206,7 +237,7 @@ def test_the_lock_is_per_system(env):
 
 def test_a_changed_configuration_is_refused_and_names_what_changed(env):
     lock(env)
-    edit(env, "systems.yaml", "model: openai/gpt-4.1-mini", "model: openai/gpt-4.1-mini-2099")
+    edit(env, "systems.yaml", "model: openai/gpt-oss-20b", "model: openai/gpt-oss-20b-2099", entry=header(API))
     with pytest.raises(LockError) as caught:
         allowed(env)
     assert "changed since it was locked" in str(caught.value)
@@ -215,7 +246,7 @@ def test_a_changed_configuration_is_refused_and_names_what_changed(env):
 
 def test_relocking_with_a_reason_allows_the_new_configuration(env):
     lock(env)
-    edit(env, "systems.yaml", "model: openai/gpt-4.1-mini", "model: openai/gpt-4.1-mini-2099")
+    edit(env, "systems.yaml", "model: openai/gpt-oss-20b", "model: openai/gpt-oss-20b-2099", entry=header(API))
     with pytest.raises(LockError):
         allowed(env)
     second = lock(env, reason="switched to the dated model id")
@@ -225,8 +256,8 @@ def test_relocking_with_a_reason_allows_the_new_configuration(env):
 
 def test_reverting_a_change_makes_the_old_lock_valid_again(env):
     first = lock(env)
-    edit(env, "systems.yaml", "model: openai/gpt-4.1-mini", "model: openai/gpt-4.1-mini-2099")
-    edit(env, "systems.yaml", "model: openai/gpt-4.1-mini-2099", "model: openai/gpt-4.1-mini")
+    edit(env, "systems.yaml", "model: openai/gpt-oss-20b", "model: openai/gpt-oss-20b-2099", entry=header(API))
+    edit(env, "systems.yaml", "model: openai/gpt-oss-20b-2099", "model: openai/gpt-oss-20b", entry=header(API))
     assert allowed(env) == first
 
 
@@ -234,7 +265,7 @@ def test_a_lock_for_one_subset_does_not_cover_another(env):
     lock(env, API, "S500")
     with pytest.raises(LockError, match=r"locked for \['S500'\] but not for S300"):
         allowed(env, API, "S300")
-    lock(env, API, "S300", reason="paired comparison on the S300 items")
+    lock(env, API, "S300", reason="S300 is pre-registered, so a row can still be locked and run on it")
     assert allowed(env, API, "S300")["subset"] == "S300"
 
 
@@ -284,6 +315,14 @@ def test_history_is_append_only(env):
     assert len(after.splitlines()) == 3 and after.endswith("\n")
 
 
+@pytest.mark.parametrize("system", API_ROWS)
+def test_every_api_row_can_be_locked_as_shipped(env, system):
+    assert config.lock_blockers(system, config_dir=env.config_dir) == []  # no checkpoint to pin, and a price entry exists
+    entry = lock(env, system)
+    assert (entry["system"], entry["subset"]) == (system, "S500")
+    assert allowed(env, system) == entry
+
+
 def test_an_incomplete_system_cannot_be_locked(env):
     blockers = config.lock_blockers(LOCAL, config_dir=env.config_dir)
     assert {"checkpoint.adapter", "checkpoint.epoch", "checkpoint.base_revision"} <= {b.split(" ")[0] for b in blockers}
@@ -297,7 +336,7 @@ def test_an_incomplete_system_cannot_be_locked(env):
 
 
 def test_a_missing_price_entry_blocks_the_lock(env):
-    edit(env, "systems.yaml", "price_id: openai-gpt-4.1-mini", "price_id: no-such-price")
+    edit(env, "systems.yaml", "price_id: groq-gpt-oss-20b", "price_id: no-such-price", entry=header(API))
     assert any("no-such-price" in b for b in config.lock_blockers(API, config_dir=env.config_dir))
     with pytest.raises(LockError, match="no-such-price"):
         lock(env)
@@ -316,7 +355,7 @@ def test_lock_script_write_and_show(env):
     lines: list[str] = []
     kw = {"config_dir": env.config_dir, "processed_dir": env.processed, "lock_path": env.lock, "out": lines.append}
     assert script.run(write=True, system=API, reason="go", **kw) == 0
-    assert any("locked gh-gpt-4.1-mini-k10 for S500" in line for line in lines)
+    assert any("locked groq-gpt-oss-20b-k10 for S500" in line for line in lines)
     lines.clear()
     assert script.run(show=True, system=API, **kw) == 0
     text = "\n".join(lines)

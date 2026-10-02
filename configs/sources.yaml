@@ -5,10 +5,11 @@
 # (URL and date included) is copied into every run summary. The test lock hashes the entry
 # a system uses, so changing a price after locking is caught.
 #
-# These values were transcribed from the project plan. The OpenAI deprecation dates were
-# cross-checked against a saved copy of the page named below; the prices and free-tier limits
-# were not re-checked against their pages. Re-read a page and update `retrieved_on` before
-# relying on a number.
+# The OpenAI deprecation dates were cross-checked against a saved copy of the page named
+# below. The prices and free-tier limits with retrieved_on 2026-10-02 were read from their
+# pages on that date; the gpt-oss-120b price and the GPU price come from the project plan
+# (2026-10-01) and were not re-read. Re-read a page and update `retrieved_on` before relying
+# on a number.
 #
 # The API systems run on free tiers, so no money is spent: every cost is what the same calls
 # would cost at the paid list price below (see billing_basis).
@@ -18,25 +19,15 @@ billing_basis: "free tier; priced at paid list price"
 
 # --- list prices, USD per 1M tokens ----------------------------------------------------------
 prices:
-  openai-gpt-4.1-mini:
-    provider: openai
-    model: gpt-4.1-mini
-    url: https://developers.openai.com/api/docs/pricing
-    retrieved_on: "2026-10-01"
+  groq-gpt-oss-20b:
+    provider: groq
+    model: openai/gpt-oss-20b
+    url: https://console.groq.com/docs/model/openai/gpt-oss-20b
+    retrieved_on: "2026-10-02"
     usd_per_mtok:
-      input: 0.40
-      cached_input: 0.10
-      output: 1.60
-
-  openai-gpt-4.1:
-    provider: openai
-    model: gpt-4.1
-    url: https://developers.openai.com/api/docs/pricing
-    retrieved_on: "2026-10-01"
-    usd_per_mtok:
-      input: 2.00
-      cached_input: 0.50
-      output: 8.00
+      input: 0.075
+      cached_input: 0.037
+      output: 0.30
 
   groq-gpt-oss-120b:
     provider: groq
@@ -48,38 +39,62 @@ prices:
       cached_input: 0.075
       output: 0.60
 
+  groq-qwen3.8-27b:
+    provider: groq
+    model: qwen/qwen3.8-27b
+    url: https://console.groq.com/docs/model/qwen/qwen3.8-27b
+    retrieved_on: "2026-10-02"
+    # The page lists no cached-input price, so no caching discount is assumed.
+    usd_per_mtok:
+      input: 0.80
+      output: 4.00
+
+  google-gemini-3.8-flash:
+    provider: google
+    model: gemini-3.8-flash
+    url: https://ai.google.dev/gemini-api/docs/pricing
+    retrieved_on: "2026-10-02"
+    # The page gives these prices through 2026-12-31 and 1.50 / 0.15 / 7.50 from 2027-01-01.
+    usd_per_mtok:
+      input: 0.75
+      cached_input: 0.075
+      output: 3.75
+
 # --- free-tier limits, as published ----------------------------------------------------------
 # `observed` stays empty until scripts/check_free_tiers.py has run against the real endpoint.
 free_tier_limits:
-  github-models:
-    url: https://docs.github.com/en/enterprise-cloud@latest/github-models/use-github-models/prototyping-with-ai-models
-    retrieved_on: "2026-10-01"
-    tiers:
-      low:
-        requests_per_minute: 15
-        requests_per_day: 150
-        concurrent_requests: 2
-        max_input_tokens: 8000
-        max_output_tokens: 4000
-      high:
-        requests_per_minute: 10
-        requests_per_day: 50
-        concurrent_requests: 2
-        max_input_tokens: 8000
-        max_output_tokens: 4000
-    observed:
-      checked_on: null
-      models: null
-
   groq:
     url: https://console.groq.com/docs/rate-limits
-    retrieved_on: "2026-10-01"
+    retrieved_on: "2026-10-02"
     models:
+      openai/gpt-oss-20b:
+        requests_per_minute: 30
+        requests_per_day: 1000
+        tokens_per_minute: 8000
+        tokens_per_day: 200000
       openai/gpt-oss-120b:
         requests_per_minute: 30
         requests_per_day: 1000
         tokens_per_minute: 8000
         tokens_per_day: 200000
+      qwen/qwen3.8-27b:
+        requests_per_minute: 30
+        requests_per_day: 1000
+        tokens_per_minute: 8000
+        tokens_per_day: 200000
+    observed:
+      checked_on: null
+      models: null
+
+  gemini:
+    url: https://ai.google.dev/gemini-api/docs/rate-limits
+    retrieved_on: "2026-10-02"
+    # Not transcribed yet: the free-tier limits for this project are confirmed from AI Studio
+    # and the response headers when the key is first used.
+    models:
+      gemini-3.8-flash:
+        requests_per_minute: null
+        requests_per_day: null
     observed:
       checked_on: null
       models: null

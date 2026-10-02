@@ -25,17 +25,18 @@ endpoints:
     # true: the provider's completion_tokens already include reasoning tokens (OpenAI style).
     reasoning_in_completion: true
 
-  github-models:
-    base_url: https://models.github.ai/inference # to be confirmed on day 1
-    catalog_url: https://models.github.ai/catalog/models # to be confirmed on day 1
-    api_key_env: GITHUB_MODELS_TOKEN
+  # Google AI Studio's OpenAI-compatible endpoint, on the free tier (a free key from
+  # aistudio.google.com).
+  gemini:
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai # to be confirmed by check_free_tiers
+    api_key_env: GEMINI_API_KEY
     supports_json_schema: false # flip to true if check_free_tiers reports the strict schema accepted
-    reasoning_in_completion: true
+    reasoning_in_completion: true # to be confirmed: whether completion_tokens include thinking tokens
 
   groq:
     base_url: https://api.groq.com/openai/v1
     api_key_env: GROQ_API_KEY
-    supports_json_schema: false # flip to true if check_free_tiers reports the strict schema accepted
+    supports_json_schema: true # check_free_tiers, 2026-10-02: accepted by all three models
     reasoning_in_completion: true
 
 # --- systems -----------------------------------------------------------------------------------
@@ -85,43 +86,25 @@ systems:
     limits:
       max_concurrency: 8
 
-  gh-gpt-4.1-mini-k10:
-    endpoint: github-models
-    model: openai/gpt-4.1-mini
-    tier: low
+  groq-gpt-oss-20b-k10:
+    endpoint: groq
+    model: openai/gpt-oss-20b
     prompt: fewshot_k10_v1
     dev_prompts: [zeroshot_v1]
     test_subset: S500
-    price_id: openai-gpt-4.1-mini
+    price_id: groq-gpt-oss-20b
     params:
       temperature: 0
-      max_tokens: 256
+      reasoning_effort: low
+      # A reasoning model: the budget covers reasoning tokens as well as the JSON answer, and
+      # both count against the token limits below.
+      max_completion_tokens: 1024
     drop_params: []
     limits:
-      rpm: 15
-      rpd: 150
-      max_concurrency: 2
-      max_input_tokens: 8000
-      max_output_tokens: 4000
-
-  gh-gpt-4.1-k10:
-    endpoint: github-models
-    model: openai/gpt-4.1
-    tier: high
-    prompt: fewshot_k10_v1
-    dev_prompts: [zeroshot_v1]
-    test_subset: S300
-    price_id: openai-gpt-4.1
-    params:
-      temperature: 0
-      max_tokens: 256
-    drop_params: []
-    limits:
-      rpm: 10
-      rpd: 50
-      max_concurrency: 2
-      max_input_tokens: 8000
-      max_output_tokens: 4000
+      rpm: 30
+      rpd: 1000
+      tpm: 8000
+      tpd: 200000
 
   groq-gpt-oss-120b-k10:
     endpoint: groq
@@ -142,3 +125,41 @@ systems:
       rpd: 1000
       tpm: 8000
       tpd: 200000
+
+  groq-qwen3.8-27b-k10:
+    endpoint: groq
+    model: qwen/qwen3.8-27b
+    prompt: fewshot_k10_v1
+    dev_prompts: [zeroshot_v1]
+    test_subset: S500
+    price_id: groq-qwen3.8-27b
+    params:
+      temperature: 0
+      # Instruct mode, no thinking: the same kind of answer as the base Qwen3-4B-Instruct row,
+      # from a model of the same family about seven times its size.
+      reasoning_effort: none
+      max_completion_tokens: 256
+    drop_params: []
+    limits:
+      rpm: 30
+      rpd: 1000
+      tpm: 8000
+      tpd: 200000
+
+  gemini-3.8-flash-k10:
+    endpoint: gemini
+    model: gemini-3.8-flash
+    prompt: fewshot_k10_v1
+    dev_prompts: [zeroshot_v1]
+    test_subset: S500
+    price_id: google-gemini-3.8-flash
+    params:
+      temperature: 0
+      reasoning_effort: low # to be confirmed by check_free_tiers and the dev pilot
+      max_completion_tokens: 1024
+    drop_params: []
+    limits:
+      # Placeholders, kept conservative, until check_free_tiers and the response headers
+      # confirm the free-tier limits for this project.
+      rpm: 10
+      rpd: 250

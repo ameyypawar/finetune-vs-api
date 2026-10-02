@@ -12,7 +12,18 @@ import yaml
 
 from conftest import load_script
 from finetune_vs_api import config, metrics
-from results_fixtures import BASE, FT, FULLER, GROQ, MINI, STUB_MODEL, Lab
+from results_fixtures import (
+    API_SYSTEMS,
+    BASE,
+    FT,
+    GEMINI,
+    GPT_OSS_20B,
+    GPT_OSS_120B,
+    QWEN_27B,
+    STUB_MODEL,
+    SYSTEMS,
+    Lab,
+)
 
 compare = load_script("compare")
 N = 200  # bootstrap resamples: enough to be stable, small enough to be quick
@@ -32,10 +43,22 @@ def build(lab: Lab, n_resamples: int = N, **kwargs):
 
 @pytest.fixture(scope="module")
 def standard(tmp_path_factory):
-    """The five systems, the audit and a benchmark; built and compared once for the whole module."""
+    """The six systems, the audit and a benchmark; built and compared once for the whole module."""
     with pytest.MonkeyPatch.context() as mp:
         quiet_git(mp)
         lab = Lab(tmp_path_factory.mktemp("standard")).populate()
+        doc = build(lab)
+    return lab, doc
+
+
+@pytest.fixture(scope="module")
+def mixed(tmp_path_factory):
+    """The standard set with one API row moved to S300, the pre-registered subset no real row uses."""
+    with pytest.MonkeyPatch.context() as mp:
+        quiet_git(mp)
+        lab = Lab(tmp_path_factory.mktemp("mixed"))
+        lab.move_to_subset(GEMINI, "S300")
+        lab.populate()
         doc = build(lab)
     return lab, doc
 
@@ -54,31 +77,43 @@ def em_vector(lab: Lab, name: str, ids) -> np.ndarray:
 def test_every_system_is_compared_on_its_own_subset(standard):
     lab, doc = standard
     assert doc["reference"] == FT and doc["subsets"]["headline"] == "S500"
-    assert [s["name"] for s in doc["systems"]] == [FT, BASE, MINI, FULLER, GROQ]
-    for name, subset, n in ((FT, "S500", 500), (BASE, "S500", 500), (MINI, "S500", 500), (FULLER, "S300", 300), (GROQ, "S500", 500)):
+    assert [s["name"] for s in doc["systems"]] == list(SYSTEMS)
+    for name in SYSTEMS:  # every API row runs on S500, and the self-hosted rows are compared there too
         s = system(doc, name)
-        assert (s["comparison_subset"], s["n_subset"], s["n_scored"], s["status"]) == (subset, n, n, "complete")
-        assert s["metrics"]["n"] == n
+        assert (s["comparison_subset"], s["n_subset"], s["n_scored"], s["status"]) == ("S500", 500, 500, "complete")
+        assert s["metrics"]["n"] == 500
 
 
 def test_the_pairing_uses_the_same_items_for_both_systems(standard):
     lab, doc = standard
-    for name, subset in ((BASE, "S500"), (MINI, "S500"), (FULLER, "S300"), (GROQ, "S500")):
+    ids = lab.ids("S500")
+    for name in (BASE, *API_SYSTEMS):
         pair = system(doc, name)["vs_reference"]
-        ids = lab.ids(subset)
-        assert (pair["subset"], pair["n"], pair["complete"]) == (subset, len(ids), True)
+        assert (pair["subset"], pair["n"], pair["complete"]) == ("S500", len(ids), True)
         # both exact-match values were taken over exactly those items
         assert pair["system_exact_match"]["value"] == pytest.approx(em_vector(lab, name, ids).mean())
         assert pair["reference_exact_match"]["value"] == pytest.approx(em_vector(lab, FT, ids).mean())
     assert system(doc, FT)["vs_reference"] is None  # the reference is not compared with itself
 
 
-def test_gpt_4_1_is_compared_with_the_fine_tune_on_s300_not_s500(standard):
-    lab, doc = standard
-    on_300 = em_vector(lab, FT, lab.ids("S300")).mean()
-    on_500 = em_vector(lab, FT, lab.ids("S500")).mean()
-    assert on_300 != pytest.approx(on_500)  # the fixture's wrong sets make the two differ
-    assert system(doc, FULLER)["vs_reference"]["reference_exact_match"]["value"] == pytest.approx(on_300)
+def test_a_row_on_a_smaller_subset_is_compared_with_the_fine_tune_on_that_subset(mixed):
+    """No real row uses S300 now, but the pairing still follows each system's own test subset."""
+    lab, doc = mixed
+    s = system(doc, GEMINI)
+    assert (s["comparison_subset"], s["n_subset"], s["n_scored"], s["status"]) == ("S300", 300, 300, "complete")
+    assert doc["subsets"]["headline"] == "S500" and doc["subsets"]["info"]["S300"]["n"] == 300
+    for name in (FT, BASE, GPT_OSS_20B, GPT_OSS_120B, QWEN_27B):  # the others are untouched
+        assert system(doc, name)["comparison_subset"] == "S500"
+    ids = lab.ids("S300")
+    pair = s["vs_reference"]
+    assert (pair["subset"], pair["n"], pair["complete"]) == ("S300", 300, True)
+    on_300 = em_vector(lab, FT, ids).mean()
+    assert on_300 != pytest.approx(em_vector(lab, FT, lab.ids("S500")).mean())  # the fixture's wrong sets make the two differ
+    assert pair["reference_exact_match"]["value"] == pytest.approx(on_300)  # the fine-tune, scored on the same 300 items
+    assert pair["system_exact_match"]["value"] == pytest.approx(em_vector(lab, GEMINI, ids).mean())
+    expected = metrics.paired_bootstrap(em_vector(lab, GEMINI, ids), em_vector(lab, FT, ids), n_resamples=N)
+    assert pair["difference"]["ci95"] == [expected.ci_low, expected.ci_high]
+    assert s["cost"]["calls"] == 300 and s["full_test"] is None
 
 
 def test_the_full_split_is_a_secondary_column_for_the_self_hosted_rows_only(standard):
@@ -90,7 +125,7 @@ def test_the_full_split_is_a_secondary_column_for_the_self_hosted_rows_only(stan
         assert (full["n_expected"], full["n_scored"], full["complete"]) == (len(lab.test), len(lab.test), True)
         assert full["metrics"]["n"] == len(lab.test)
         assert full["metrics"]["exact_match"]["value"] == pytest.approx(em_vector(lab, name, lab.all_ids).mean())
-    for name in (MINI, FULLER, GROQ):
+    for name in API_SYSTEMS:
         assert system(doc, name)["kind"] == "api" and system(doc, name)["full_test"] is None
 
 
@@ -99,7 +134,7 @@ def test_scoring_reuses_the_runner_so_failed_calls_count_as_wrong(tmp_path, monk
     lab = Lab(tmp_path)
     ids = lab.ids("S500")
     lab.write_run(FT, wrong=ids[:10], errors=ids[10:15])
-    lab.write_run(MINI, ids=ids)
+    lab.write_run(GPT_OSS_20B, ids=ids)
     s = system(build(lab), FT)
     assert s["metrics"]["exact_match"]["value"] == pytest.approx(1 - 15 / 500)
     assert s["metrics"]["schema_valid_rate"]["value"] == pytest.approx(1 - 5 / 500)  # failed calls are not valid
@@ -111,7 +146,7 @@ def test_scoring_reuses_the_runner_so_failed_calls_count_as_wrong(tmp_path, monk
 
 def test_exact_match_intervals_are_the_seeded_bootstrap_of_the_per_item_scores(standard):
     lab, doc = standard
-    for name in (FT, MINI, GROQ):
+    for name in (FT, *API_SYSTEMS):
         s = system(doc, name)
         vector = em_vector(lab, name, lab.ids(s["comparison_subset"]))
         low, high = metrics.bootstrap_ci(vector, n_resamples=N)
@@ -122,8 +157,8 @@ def test_exact_match_intervals_are_the_seeded_bootstrap_of_the_per_item_scores(s
 
 def test_the_paired_difference_is_the_paired_bootstrap_of_system_minus_reference(standard):
     lab, doc = standard
-    for name, subset in ((MINI, "S500"), (FULLER, "S300"), (BASE, "S500")):
-        ids = lab.ids(subset)
+    ids = lab.ids("S500")
+    for name in (BASE, *API_SYSTEMS):
         expected = metrics.paired_bootstrap(em_vector(lab, name, ids), em_vector(lab, FT, ids), n_resamples=N)
         d = system(doc, name)["vs_reference"]["difference"]
         assert d["direction"] == "system minus reference"
@@ -150,7 +185,7 @@ def test_the_bootstrap_settings_are_recorded(standard):
 
 
 def two_systems(tmp_path, monkeypatch, *, ref_only: int, system_only: int, both: int):
-    """The fine-tune and gpt-4.1-mini on S500 with exactly this many discordant and shared errors.
+    """The fine-tune and groq-gpt-oss-20b on S500 with exactly this many discordant and shared errors.
 
     `ref_only` items the fine-tune gets wrong and the system right, `system_only` the reverse.
     """
@@ -161,7 +196,7 @@ def two_systems(tmp_path, monkeypatch, *, ref_only: int, system_only: int, both:
     ft_wrong = ids[:a] + ids[b : b + both]
     mini_wrong = ids[a:b] + ids[b : b + both]
     lab.write_run(FT, wrong=ft_wrong)
-    lab.write_run(MINI, wrong=mini_wrong)
+    lab.write_run(GPT_OSS_20B, wrong=mini_wrong)
     return lab
 
 
@@ -172,7 +207,7 @@ def mcnemar_p(a: int, b: int) -> float:
 
 def test_mcnemar_counts_are_oriented_system_over_reference(tmp_path, monkeypatch):
     lab = two_systems(tmp_path, monkeypatch, ref_only=30, system_only=10, both=20)
-    pair = system(build(lab, 1000), MINI)["vs_reference"]
+    pair = system(build(lab, 1000), GPT_OSS_20B)["vs_reference"]
     # the system is right where the fine-tune is wrong on 30 items, and wrong where it is right on 10
     assert pair["mcnemar"]["system_only"] == 30 and pair["mcnemar"]["reference_only"] == 10
     assert pair["mcnemar"]["p_value"] == pytest.approx(mcnemar_p(30, 10))
@@ -182,7 +217,7 @@ def test_mcnemar_counts_are_oriented_system_over_reference(tmp_path, monkeypatch
 
 def test_mcnemar_with_no_discordant_items_is_one(tmp_path, monkeypatch):
     lab = two_systems(tmp_path, monkeypatch, ref_only=0, system_only=0, both=25)
-    pair = system(build(lab, 300), MINI)["vs_reference"]
+    pair = system(build(lab, 300), GPT_OSS_20B)["vs_reference"]
     assert (pair["mcnemar"]["system_only"], pair["mcnemar"]["reference_only"], pair["mcnemar"]["p_value"]) == (0, 0, 1.0)
     assert pair["difference"]["value"] == 0.0
 
@@ -190,9 +225,9 @@ def test_mcnemar_with_no_discordant_items_is_one(tmp_path, monkeypatch):
 def test_the_standard_set_agrees_with_the_mcnemar_test_on_the_same_discordant_counts(standard):
     lab, doc = standard
     ids = lab.ids("S500")
-    system_only = sum(1 for i in ids if i in lab.wrong[FT] and i not in lab.wrong[MINI])
-    reference_only = sum(1 for i in ids if i in lab.wrong[MINI] and i not in lab.wrong[FT])
-    mc = system(doc, MINI)["vs_reference"]["mcnemar"]
+    system_only = sum(1 for i in ids if i in lab.wrong[FT] and i not in lab.wrong[GPT_OSS_20B])
+    reference_only = sum(1 for i in ids if i in lab.wrong[GPT_OSS_20B] and i not in lab.wrong[FT])
+    mc = system(doc, GPT_OSS_20B)["vs_reference"]["mcnemar"]
     assert (mc["system_only"], mc["reference_only"]) == (system_only, reference_only)
     assert mc["p_value"] == pytest.approx(mcnemar_p(system_only, reference_only))
 
@@ -237,14 +272,14 @@ def test_the_wording_follows_the_interval_in_the_document(standard):
 @pytest.mark.parametrize(
     ("ref_only", "system_only", "relation", "text"),
     [
-        (30, 10, "system_beats_reference", f"{MINI} beats {FT}"),
-        (10, 30, "reference_beats_system", f"{FT} beats {MINI}"),
-        (12, 10, "no_significant_difference", f"no significant difference between {MINI} and {FT}"),
+        (30, 10, "system_beats_reference", f"{GPT_OSS_20B} beats {FT}"),
+        (10, 30, "reference_beats_system", f"{FT} beats {GPT_OSS_20B}"),
+        (12, 10, "no_significant_difference", f"no significant difference between {GPT_OSS_20B} and {FT}"),
     ],
 )
 def test_the_three_wordings_end_to_end(tmp_path, monkeypatch, ref_only, system_only, relation, text):
     lab = two_systems(tmp_path, monkeypatch, ref_only=ref_only, system_only=system_only, both=20)
-    pair = system(build(lab, 1000), MINI)["vs_reference"]
+    pair = system(build(lab, 1000), GPT_OSS_20B)["vs_reference"]
     # ref_only counts items the fine-tune gets wrong: that favours the system
     assert pair["verdict"] == {"relation": relation, "text": text}
 
@@ -255,25 +290,25 @@ def test_an_interval_and_a_mcnemar_test_that_disagree_are_flagged(tmp_path, monk
     lab = two_systems(tmp_path, monkeypatch, ref_only=12, system_only=4, both=0)
     monkeypatch.setattr(metrics, "paired_bootstrap", lambda *a, **k: metrics.PairedResult(0.016, 0.001, 0.031, 0.04, 500))
     doc = build(lab)
-    pair = system(doc, MINI)["vs_reference"]
+    pair = system(doc, GPT_OSS_20B)["vs_reference"]
     assert pair["mcnemar"]["p_value"] == pytest.approx(mcnemar_p(12, 4)) and pair["mcnemar"]["p_value"] > 0.05
     assert pair["verdict"]["relation"] == "system_beats_reference"  # the wording follows the interval
     flagged = [w for w in doc["warnings"] if "disagree" in w]
-    assert len(flagged) == 1 and MINI in flagged[0] and "the wording follows the interval" in flagged[0]
+    assert len(flagged) == 1 and GPT_OSS_20B in flagged[0] and "the wording follows the interval" in flagged[0]
 
 
 def test_the_converse_disagreement_is_flagged_too(tmp_path, monkeypatch):
     lab = two_systems(tmp_path, monkeypatch, ref_only=25, system_only=5, both=0)  # McNemar p is far below 0.05
     monkeypatch.setattr(metrics, "paired_bootstrap", lambda *a, **k: metrics.PairedResult(0.04, -0.001, 0.08, 0.04, 500))
     doc = build(lab)
-    assert system(doc, MINI)["vs_reference"]["verdict"]["relation"] == "no_significant_difference"
+    assert system(doc, GPT_OSS_20B)["vs_reference"]["verdict"]["relation"] == "no_significant_difference"
     assert len([w for w in doc["warnings"] if "disagree" in w]) == 1
 
 
 def test_agreement_raises_no_flag(tmp_path, monkeypatch):
     lab = two_systems(tmp_path, monkeypatch, ref_only=30, system_only=10, both=20)
     doc = build(lab, 1000)
-    assert system(doc, MINI)["vs_reference"]["verdict"]["relation"] == "system_beats_reference"
+    assert system(doc, GPT_OSS_20B)["vs_reference"]["verdict"]["relation"] == "system_beats_reference"
     assert not [w for w in doc["warnings"] if "disagree" in w]
 
 
@@ -286,7 +321,7 @@ def test_exact_match_on_items_whose_text_is_not_in_train(standard):
     assert in_train == set(lab.planted) and len(in_train) == 3
     assert doc["data"]["audit"]["test_items_with_text_in_train"] == 3
     s500 = lab.ids("S500")
-    for name in (FT, MINI, GROQ):
+    for name in (FT, *API_SYSTEMS):
         s = system(doc, name)
         ids = [i for i in lab.ids(s["comparison_subset"]) if i not in in_train]
         block = s["unseen_text"]
@@ -297,15 +332,24 @@ def test_exact_match_on_items_whose_text_is_not_in_train(standard):
     assert system(doc, FT)["full_test"]["unseen_text"]["excluded"] == 3  # the planted item outside S500 counts here
 
 
+def test_the_unseen_text_figure_follows_a_smaller_subset_too(mixed):
+    lab, doc = mixed
+    in_train = set(lab.planted)
+    ids = [i for i in lab.ids("S300") if i not in in_train]
+    block = system(doc, GEMINI)["unseen_text"]
+    assert block["n"] == len(ids) and block["excluded"] == 300 - len(ids) == len(in_train & set(lab.ids("S300")))
+    assert block["value"] == pytest.approx(em_vector(lab, GEMINI, ids).mean())
+
+
 def test_exact_match_per_scenario(standard):
     lab, doc = standard
-    s = system(doc, MINI)
+    s = system(doc, GPT_OSS_20B)
     ids = lab.ids("S500")
     assert sum(v["n"] for v in s["per_scenario"].values()) == len(ids)
     for scenario, cell in s["per_scenario"].items():
         in_scenario = [i for i in ids if lab.by_id[i].scenario == scenario]
         assert cell["n"] == len(in_scenario)
-        assert cell["exact_match"] == pytest.approx(em_vector(lab, MINI, in_scenario).mean())
+        assert cell["exact_match"] == pytest.approx(em_vector(lab, GPT_OSS_20B, in_scenario).mean())
     assert len(s["per_scenario"]) == 18
 
 
@@ -313,20 +357,25 @@ def test_exact_match_per_scenario(standard):
 
 
 def test_api_cost_per_1k_calls_has_both_cache_bounds(standard):
-    _, doc = standard
-    # 1,000 prompt tokens (800 of them the static prefix) and 100 completion tokens per call
+    lab, doc = standard
+    # 1,000 prompt tokens (800 of them the static prefix) and 100 completion tokens per call, prices per million
     expected = {
-        MINI: {"upper": 1.2, "lower": 0.6},  # (1000 * 1.0 + 100 * 2.0) and (200 * 1.0 + 800 * 0.25 + 100 * 2.0), per million
-        FULLER: {"upper": 4.8, "lower": 2.4},
-        GROQ: {"upper": 0.6, "lower": 0.4},
+        GPT_OSS_20B: {"upper": 1.2, "lower": 0.6},  # (1000 * 1.0 + 100 * 2.0) and (200 * 1.0 + 800 * 0.25 + 100 * 2.0)
+        GPT_OSS_120B: {"upper": 0.6, "lower": 0.4},
+        QWEN_27B: {"upper": 2.4, "lower": 2.4},  # (1000 * 2.0 + 100 * 4.0) twice: no cached-input price, nothing is discounted
+        GEMINI: {"upper": 1.4, "lower": 1.0},  # (1000 * 1.0 + 100 * 4.0) and (200 * 1.0 + 800 * 0.5 + 100 * 4.0)
     }
+    assert set(expected) == set(API_SYSTEMS)
     for name, bounds in expected.items():
         c = system(doc, name)["cost"]
         assert c["per_1k_calls_usd"]["upper"] == pytest.approx(bounds["upper"])
         assert c["per_1k_calls_usd"]["lower"] == pytest.approx(bounds["lower"])
         assert c["billing_basis"] == "free tier; priced at paid list price"
-        assert c["price"]["url"].startswith("https://") and c["price"]["retrieved_on"] == "2026-10-01"
-    assert system(doc, MINI)["cost"]["calls"] == 500 and system(doc, FULLER)["cost"]["calls"] == 300
+        entry = lab.sources["prices"][config.resolve_system(name, lab.config_dir)["price_id"]]
+        assert c["price"]["url"].startswith("https://")
+        assert (c["price"]["url"], c["price"]["retrieved_on"]) == (entry["url"], entry["retrieved_on"])  # the entry the run used
+        assert c["calls"] == 500
+    assert "cached_input" not in system(doc, QWEN_27B)["cost"]["price"]["usd_per_mtok"]
 
 
 def test_self_hosted_cost_is_the_gpu_price_at_the_operating_point(standard):
@@ -345,15 +394,20 @@ def test_break_even_is_the_monthly_gpu_bill_over_the_api_cost_per_call(standard)
     assert be["gpu"]["usd_per_hour"] == 0.5 and be["gpu"]["hours_per_month"] == 730
     assert be["gpu"]["monthly_usd"] == pytest.approx(365.0)
     assert be["gpu"]["url"] == "https://instances.vantage.sh/aws/ec2/g4dn.xlarge"
-    assert set(be["apis"]) == {MINI, FULLER, GROQ}
+    assert set(be["apis"]) == set(API_SYSTEMS)
     # $365 a month over $0.0012 / $0.0006 a call
-    mini = be["apis"][MINI]["calls_per_month"]
-    assert mini["no_caching"] == pytest.approx(365.0 / 0.0012) and mini["cached_prefix"] == pytest.approx(365.0 / 0.0006)
-    assert be["apis"][FULLER]["calls_per_month"]["no_caching"] == pytest.approx(365.0 / 0.0048)
-    assert be["apis"][GROQ]["calls_per_month"]["cached_prefix"] == pytest.approx(365.0 / 0.0004)
-    assert be["apis"][MINI]["requests_per_s"]["no_caching"] == pytest.approx(365.0 / 0.0012 / (730 * 3600))
-    for entry in be["apis"].values():  # the smaller volume is the dearer API bound
-        assert entry["calls_per_month"]["no_caching"] < entry["calls_per_month"]["cached_prefix"]
+    small = be["apis"][GPT_OSS_20B]["calls_per_month"]
+    assert small["no_caching"] == pytest.approx(365.0 / 0.0012) and small["cached_prefix"] == pytest.approx(365.0 / 0.0006)
+    assert be["apis"][GPT_OSS_120B]["calls_per_month"]["cached_prefix"] == pytest.approx(365.0 / 0.0004)
+    assert be["apis"][GEMINI]["calls_per_month"]["no_caching"] == pytest.approx(365.0 / 0.0014)
+    assert be["apis"][GEMINI]["calls_per_month"]["cached_prefix"] == pytest.approx(365.0 / 0.0010)
+    assert be["apis"][GPT_OSS_20B]["requests_per_s"]["no_caching"] == pytest.approx(365.0 / 0.0012 / (730 * 3600))
+    for name, entry in be["apis"].items():
+        no_caching, cached_prefix = entry["calls_per_month"]["no_caching"], entry["calls_per_month"]["cached_prefix"]
+        if name == QWEN_27B:  # no cached-input price: caching saves nothing, so the two volumes coincide
+            assert no_caching == pytest.approx(365.0 / 0.0024) and cached_prefix == pytest.approx(no_caching)
+        else:  # the smaller volume is the dearer API bound
+            assert no_caching < cached_prefix, name
     assert be["capacity_calls_per_month"] == pytest.approx(26_280_000)
     assert all(all(v is True for v in e["within_capacity"].values()) for e in be["apis"].values())
 
@@ -362,24 +416,24 @@ def test_a_break_even_above_what_one_gpu_can_serve_is_marked(tmp_path, monkeypat
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(MINI)
+    lab.write_run(GPT_OSS_20B)
     slow = {"gpu": "Tesla T4", "system": FT, "levels": [{"concurrency": 1, "requests_per_s": 0.001, "latency_s": {"p50": 9.0, "p95": 9.5}}], "operating_point": 1}
     lab.write_serving(doc=slow)
     be = build(lab)["break_even"]
     assert be["capacity_calls_per_month"] == pytest.approx(0.001 * 3600 * 730)  # 2,628 calls a month
-    assert be["apis"][MINI]["within_capacity"] == {"no_caching": False, "cached_prefix": False}
+    assert be["apis"][GPT_OSS_20B]["within_capacity"] == {"no_caching": False, "cached_prefix": False}
 
 
 def test_without_a_benchmark_the_break_even_stands_but_capacity_and_self_hosted_cost_do_not(tmp_path, monkeypatch):
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(MINI)
+    lab.write_run(GPT_OSS_20B)
     doc = build(lab)
     be = doc["break_even"]
     assert be["capacity_calls_per_month"] is None
-    assert be["apis"][MINI]["calls_per_month"]["no_caching"] == pytest.approx(365.0 / 0.0012)
-    assert be["apis"][MINI]["within_capacity"] == {"no_caching": None, "cached_prefix": None}
+    assert be["apis"][GPT_OSS_20B]["calls_per_month"]["no_caching"] == pytest.approx(365.0 / 0.0012)
+    assert be["apis"][GPT_OSS_20B]["within_capacity"] == {"no_caching": None, "cached_prefix": None}
     assert system(doc, FT)["cost"] is None and doc["self_hosted"]["benchmark"] is None
     assert any("no throughput benchmark" in w for w in doc["warnings"])
 
@@ -407,7 +461,7 @@ def test_api_latency_is_an_appendix_with_its_label(standard):
     _, doc = standard
     appendix = doc["latency"]["api_appendix"]
     assert appendix["label"] == "observed on free tiers from India; not representative of paid tiers"
-    assert set(appendix["systems"]) == {MINI, FULLER, GROQ}
+    assert set(appendix["systems"]) == set(API_SYSTEMS)
     for entry in appendix["systems"].values():
         assert entry["p50"] <= entry["p95"] and entry["method"] == "nearest-rank" and entry["n"] > 0
     assert "Headline latency is the self-hosted rows" in doc["latency"]["policy"]
@@ -420,33 +474,33 @@ def test_a_model_name_that_changes_partway_through_is_flagged(tmp_path, monkeypa
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(MINI, models=lambda position: "gpt-4.1-mini-2025-04-14" if position <= 120 else "gpt-4.1-mini-2026-09-30")
-    lab.write_run(GROQ)
+    lab.write_run(GEMINI, models=lambda position: "gemini-3.8-flash-001" if position <= 120 else "gemini-3.8-flash-002")
+    lab.write_run(GPT_OSS_120B)
     doc = build(lab)
-    names = system(doc, MINI)["model_names"]
+    names = system(doc, GEMINI)["model_names"]
     assert names["changed"] is True
-    assert names["returned"] == ["gpt-4.1-mini-2025-04-14", "gpt-4.1-mini-2026-09-30"]
+    assert names["returned"] == ["gemini-3.8-flash-001", "gemini-3.8-flash-002"]
     assert [(s["rows"], s["first_row"], s["last_row"]) for s in names["segments"]] == [(120, 1, 120), (380, 121, 500)]
-    assert names["requested"] == "openai/gpt-4.1-mini"
+    assert names["requested"] == "gemini-3.8-flash"
     flagged = [w for w in doc["warnings"] if "model name" in w]
-    assert len(flagged) == 1 and MINI in flagged[0] and "answer 120 of 500" in flagged[0]
-    assert system(doc, GROQ)["model_names"]["changed"] is False
+    assert len(flagged) == 1 and GEMINI in flagged[0] and "answer 120 of 500" in flagged[0]
+    assert system(doc, GPT_OSS_120B)["model_names"]["changed"] is False
 
 
 def test_a_name_that_flips_back_is_still_a_change(tmp_path, monkeypatch):
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(MINI, models=lambda position: "b" if 100 < position <= 200 else "a")
-    names = system(build(lab), MINI)["model_names"]
+    lab.write_run(GPT_OSS_20B, models=lambda position: "b" if 100 < position <= 200 else "a")
+    names = system(build(lab), GPT_OSS_20B)["model_names"]
     assert names["changed"] is True and names["returned"] == ["a", "b"] and len(names["segments"]) == 3
 
 
 def test_a_steady_model_name_raises_no_flag(standard):
     _, doc = standard
-    assert [s["model_names"]["changed"] for s in doc["systems"]] == [False] * 5
+    assert [s["model_names"]["changed"] for s in doc["systems"]] == [False] * len(SYSTEMS)
     assert not [w for w in doc["warnings"] if "model name" in w]
-    assert system(doc, MINI)["model_names"]["returned"] == [STUB_MODEL]
+    assert system(doc, GPT_OSS_20B)["model_names"]["returned"] == [STUB_MODEL]
 
 
 # --- missing and damaged files --------------------------------------------------------------------------------------------
@@ -456,7 +510,7 @@ def test_with_no_results_at_all_every_system_is_missing_and_nothing_is_needed(tm
     # the repository's own configs, and no data directory: nothing has been run, so nothing is read
     doc = compare.build_comparison(results_dir=tmp_path / "results", processed_dir=tmp_path / "no-data", n_resamples=N)
     assert doc["has_results"] is False
-    assert [s["status"] for s in doc["systems"]] == ["missing"] * 5
+    assert [s["status"] for s in doc["systems"]] == ["missing"] * len(SYSTEMS)
     assert all(s["metrics"] is None and s["vs_reference"] is None and s["cost"] is None for s in doc["systems"])
     assert doc["break_even"]["apis"] == {} and doc["latency"]["api_appendix"]["systems"] == {}
     assert doc["warnings"] == []  # nothing is wrong: nothing has been run yet
@@ -497,9 +551,9 @@ def test_a_subset_that_no_longer_matches_stops_the_run(tmp_path, monkeypatch):
 def test_a_missing_reference_leaves_the_others_unpaired_and_says_so(tmp_path, monkeypatch):
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
-    lab.write_run(MINI)
+    lab.write_run(GPT_OSS_20B)
     doc = build(lab)
-    assert system(doc, MINI)["status"] == "complete" and system(doc, MINI)["vs_reference"] is None
+    assert system(doc, GPT_OSS_20B)["status"] == "complete" and system(doc, GPT_OSS_20B)["vs_reference"] is None
     assert system(doc, FT)["status"] == "missing"
     assert any("reference system" in w and FT in w for w in doc["warnings"])
 
@@ -513,13 +567,13 @@ def test_a_missing_summary_costs_the_cost_and_the_provenance_and_nothing_else(tm
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(MINI, summary=False)
+    lab.write_run(GPT_OSS_20B, summary=False)
     doc = build(lab)
-    s = system(doc, MINI)
+    s = system(doc, GPT_OSS_20B)
     assert s["status"] == "complete" and s["metrics"]["exact_match"]["value"] == 1.0
     assert s["cost"] is None and s["run"] is None and s["latency_observed"] is None
-    assert any(MINI in w and "no summary file" in w for w in doc["warnings"])
-    assert MINI not in doc["break_even"]["apis"]
+    assert any(GPT_OSS_20B in w and "no summary file" in w for w in doc["warnings"])
+    assert GPT_OSS_20B not in doc["break_even"]["apis"]
 
 
 def test_a_missing_audit_leaves_out_the_unseen_text_figure(tmp_path, monkeypatch):
@@ -535,11 +589,11 @@ def test_a_damaged_predictions_file_marks_that_system_unreadable_and_keeps_going
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    run_dir = lab.write_run(MINI)
+    run_dir = lab.write_run(GPT_OSS_20B)
     (run_dir / "predictions.jsonl").write_text('{"id": "1", "error": null}\n{"id": "2", "tex')
     doc = build(lab)
-    assert system(doc, MINI)["status"] == "unreadable" and system(doc, FT)["status"] == "complete"
-    assert any("could not read predictions.jsonl" in w and MINI in w for w in doc["warnings"])
+    assert system(doc, GPT_OSS_20B)["status"] == "unreadable" and system(doc, FT)["status"] == "complete"
+    assert any("could not read predictions.jsonl" in w and GPT_OSS_20B in w for w in doc["warnings"])
 
 
 def test_a_partial_run_is_scored_on_what_it_has_and_flagged(tmp_path, monkeypatch):
@@ -547,13 +601,13 @@ def test_a_partial_run_is_scored_on_what_it_has_and_flagged(tmp_path, monkeypatc
     lab = Lab(tmp_path)
     ids = lab.ids("S500")
     lab.write_run(FT, wrong=ids[:50])
-    lab.write_run(MINI, ids=ids[:200], wrong=ids[:20])
+    lab.write_run(GPT_OSS_20B, ids=ids[:200], wrong=ids[:20])
     doc = build(lab)
-    s = system(doc, MINI)
+    s = system(doc, GPT_OSS_20B)
     assert (s["status"], s["n_subset"], s["n_scored"]) == ("partial", 500, 200)
     assert s["vs_reference"]["n"] == 200 and s["vs_reference"]["complete"] is False
-    assert any(MINI in w and "200 of the 500" in w for w in doc["warnings"])
-    assert any("partial summary" in w and MINI in w for w in doc["warnings"])
+    assert any(GPT_OSS_20B in w and "200 of the 500" in w for w in doc["warnings"])
+    assert any("partial summary" in w and GPT_OSS_20B in w for w in doc["warnings"])
     assert s["run"]["summary_is_partial"] is True
 
 
@@ -561,9 +615,9 @@ def test_a_run_outside_the_test_lock_is_flagged(tmp_path, monkeypatch):
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(MINI, locked=False)
+    lab.write_run(GPT_OSS_20B, locked=False)
     doc = build(lab)
-    assert any(MINI in w and "test lock" in w for w in doc["warnings"])
+    assert any(GPT_OSS_20B in w and "test lock" in w for w in doc["warnings"])
     assert not any(FT in w and "test lock" in w for w in doc["warnings"])
     assert system(doc, FT)["run"]["lock"]["reason"] == "frozen for the test run"
 
@@ -572,7 +626,7 @@ def test_estimated_token_counts_are_flagged(tmp_path, monkeypatch):
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    run_dir = lab.write_run(MINI)
+    run_dir = lab.write_run(GPT_OSS_20B)
     path = run_dir / "summary.S500.json"
     summary = json.loads(path.read_text())
     summary["tokens"]["calls_with_estimated_usage"] = 7
@@ -584,12 +638,12 @@ def test_a_changed_price_entry_is_flagged(tmp_path, monkeypatch):
     quiet_git(monkeypatch)
     lab = Lab(tmp_path)
     lab.write_run(FT)
-    lab.write_run(MINI)
-    lab.sources["prices"]["openai-gpt-4.1-mini"]["usd_per_mtok"]["input"] = 9.0
+    lab.write_run(GPT_OSS_20B)
+    lab.sources["prices"]["groq-gpt-oss-20b"]["usd_per_mtok"]["input"] = 9.0
     (lab.config_dir / "sources.yaml").write_text(yaml.safe_dump(lab.sources, sort_keys=False))
     doc = build(lab)
-    assert any("price entry" in w and MINI in w for w in doc["warnings"])
-    assert system(doc, MINI)["cost"]["per_1k_calls_usd"]["upper"] == pytest.approx(1.2)  # the entry the run recorded
+    assert any("price entry" in w and GPT_OSS_20B in w for w in doc["warnings"])
+    assert system(doc, GPT_OSS_20B)["cost"]["per_1k_calls_usd"]["upper"] == pytest.approx(1.2)  # the entry the run recorded
 
 
 # --- the benchmark file --------------------------------------------------------------------------------------------------
@@ -699,7 +753,7 @@ def test_main_writes_comparison_json_and_prints_the_findings(tmp_path, monkeypat
     assert code == 0
     written = json.loads((lab.results / "comparison.json").read_text())
     assert written["has_results"] is True and written["bootstrap"]["resamples"] == 50
-    assert any(line.strip().startswith(MINI) and "exact match" in line for line in lines)
+    assert any(line.strip().startswith(GPT_OSS_20B) and "exact match" in line for line in lines)
     assert (lab.results / "comparison.json").read_text().endswith("}\n")
 
 

@@ -17,7 +17,17 @@ import yaml
 
 from conftest import ROOT, load_script
 from finetune_vs_api import config
-from results_fixtures import BASE, FT, FULLER, GROQ, MINI, Lab
+from results_fixtures import (
+    API_SYSTEMS,
+    BASE,
+    FT,
+    GEMINI,
+    GPT_OSS_20B,
+    GPT_OSS_120B,
+    QWEN_27B,
+    SYSTEMS,
+    Lab,
+)
 
 compare = load_script("compare")
 figures = load_script("make_figures")
@@ -334,7 +344,7 @@ def test_templates_type_no_numbers(name):
 def test_the_number_check_would_catch_a_typed_number():
     assert STANDALONE_NUMBER.findall(prose_of("score of 91% on 500 items {{ ok }}")) == ["91%", "500"]
     assert NUMBER_WORDS.findall(prose_of("the ten most similar")) == ["ten"]
-    assert STANDALONE_NUMBER.findall(prose_of("S500, p95, gpt-4.1 and `0.5` are names; per 1,000 calls is the unit")) == []
+    assert STANDALONE_NUMBER.findall(prose_of("S500, p95, qwen3.8-27b, gemini-3.8-flash and `0.5` are names; per 1,000 calls is the unit")) == []
 
 
 def test_the_rendered_numbers_are_the_ones_in_the_comparison(standard, tmp_path):
@@ -367,7 +377,7 @@ def test_beats_appears_only_where_the_interval_excludes_zero(standard, tmp_path)
     for text in (repo.region(), repo.read("hf/README.md")):
         rows = accuracy_rows(text)
         assert rows[FT][5] == "reference"
-        for name in (BASE, MINI, FULLER, GROQ):
+        for name in (BASE, *API_SYSTEMS):
             interval = re.search(r"\[([+-]?[\d.]+), ([+-]?[\d.]+)\]", rows[name][3])
             low, high = float(interval.group(1)), float(interval.group(2))
             excludes_zero = low > 0 or high < 0
@@ -382,14 +392,14 @@ def test_beats_appears_only_where_the_interval_excludes_zero(standard, tmp_path)
 
 @pytest.fixture(scope="module")
 def tie(tmp_path_factory):
-    """The fine-tune and gpt-4.1-mini separated by 12 items against 10: no significant difference."""
+    """The fine-tune and groq-gpt-oss-20b separated by 12 items against 10: no significant difference."""
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(config, "git_commit", lambda cwd=None: None)
         mp.setattr(config, "git_dirty", lambda cwd=None: False)
         lab = Lab(tmp_path_factory.mktemp("tie"))
         ids = list(lab.ids("S500"))
         lab.write_run(FT, wrong=ids[:12] + ids[22:42])
-        lab.write_run(MINI, wrong=ids[12:22] + ids[22:42])
+        lab.write_run(GPT_OSS_20B, wrong=ids[12:22] + ids[22:42])
         lab.write_audit()
         lab.write_subsets()
         lab.write_serving()
@@ -402,9 +412,9 @@ def test_a_tie_is_called_no_significant_difference_everywhere(tie, tmp_path):
     repo.render()
     for text in (repo.region(), repo.read("hf/README.md")):
         rows = accuracy_rows(text)
-        assert rows[MINI][5] == "no significant difference" and not any("beats" in row[5] for row in rows.values())
+        assert rows[GPT_OSS_20B][5] == "no significant difference" and not any("beats" in row[5] for row in rows.values())
     writeup = repo.read("docs/writeup.md")
-    assert f"there is no significant difference with `{MINI}`" in writeup
+    assert f"there is no significant difference with `{GPT_OSS_20B}`" in writeup
     sentence = next(line for line in writeup.splitlines() if line.startswith("A system beats another only"))
     assert sentence.count("beats") == 1  # the rule itself; no finding says "beats"
     assert "beats the fine-tune" not in sentence and "the fine-tune beats" not in sentence
@@ -415,8 +425,39 @@ def test_the_writeup_summary_follows_the_relations(standard, tmp_path):
     repo = Repo.with_results(tmp_path / "repo", lab)
     repo.render("writeup")
     text = repo.read("docs/writeup.md")
-    assert f"On exact match, the fine-tune beats `{BASE}`, `{MINI}` and `{GROQ}`; `{FULLER}` beats the fine-tune." in text
-    assert f"On the S300 items, where `{FULLER}` is compared, the fine-tune scores" in text
+    # all three readings in one sentence: the fine-tune ahead, a system ahead of it, and one level with it
+    assert (
+        f"On exact match, the fine-tune beats `{BASE}`, `{GPT_OSS_20B}` and `{GPT_OSS_120B}`; "
+        f"`{GEMINI}` beats the fine-tune; there is no significant difference with `{QWEN_27B}`."
+    ) in text
+    assert "On the S300 items" not in text  # every row is compared on S500, so there is no smaller-subset note
+
+
+@pytest.fixture(scope="module")
+def smaller(tmp_path_factory):
+    """The fine-tune and one API row compared on S300, the pre-registered subset no real row uses."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(config, "git_commit", lambda cwd=None: None)
+        mp.setattr(config, "git_dirty", lambda cwd=None: False)
+        lab = Lab(tmp_path_factory.mktemp("smaller"))
+        lab.move_to_subset(GEMINI, "S300")
+        lab.write_run(FT)
+        lab.write_run(GEMINI)
+        lab.write_audit()
+        lab.write_subsets()
+        doc = comparison_for(lab)
+    return lab, doc
+
+
+def test_a_row_compared_on_a_smaller_subset_says_so_and_what_the_fine_tune_scores_there(smaller, tmp_path):
+    lab, doc = smaller
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    reference_on_300 = next(s for s in doc["systems"] if s["name"] == GEMINI)["vs_reference"]["reference_exact_match"]
+    note = f"On the S300 items, where `{GEMINI}` is compared, the fine-tune scores {render.pct_interval(reference_on_300)}."
+    assert note in repo.read("docs/writeup.md")
+    assert accuracy_rows(repo.region())[GEMINI][1] == "S300 (300)"  # the Items column names the subset
+    assert accuracy_rows(repo.region())[FT][1] == "S500 (500)"
 
 
 # --- the model card ---------------------------------------------------------------------------------------------------------------
@@ -555,6 +596,29 @@ def test_the_writeup_has_its_sections_in_order(standard, tmp_path):
     assert "python scripts/render.py --target all" in text
 
 
+def test_the_setup_lists_every_system_and_where_it_runs(tmp_path):
+    repo = Repo.committed(tmp_path / "repo")  # the real configs, no results
+    repo.render("writeup")
+    lines = repo.read("docs/writeup.md").splitlines()
+    fewshot = "prompt `fewshot_k10_v1` (10 retrieved examples)"
+    assert f"The comparison has {len(SYSTEMS)} systems:" in lines
+    assert [line for line in lines if line.startswith("- `") and line.endswith((", self-hosted.", ", free tier."))] == [
+        "- `ft-qwen3-4b-lora`: Qwen/Qwen3-4B-Instruct-2507 plus the LoRA adapter, prompt `finetuned_v1` (one-line instruction), self-hosted.",
+        f"- `base-qwen3-4b-k10`: Qwen/Qwen3-4B-Instruct-2507, {fewshot}, self-hosted.",
+        f"- `groq-gpt-oss-20b-k10`: openai/gpt-oss-20b, {fewshot}, Groq, free tier.",
+        f"- `groq-gpt-oss-120b-k10`: openai/gpt-oss-120b, {fewshot}, Groq, free tier.",
+        f"- `groq-qwen3.8-27b-k10`: qwen/qwen3.8-27b, {fewshot}, Groq, free tier.",
+        f"- `gemini-3.8-flash-k10`: gemini-3.8-flash, {fewshot}, Google AI Studio, free tier.",
+    ]
+    assert "GitHub" not in "\n".join(lines)
+
+
+def test_every_endpoint_in_the_configs_has_a_display_name_and_no_other_does():
+    endpoints = yaml.safe_load((ROOT / "configs" / "systems.yaml").read_text())["endpoints"]
+    assert render.ENDPOINT_NAMES == {"local": "a local server", "groq": "Groq", "gemini": "Google AI Studio"}
+    assert set(render.ENDPOINT_NAMES) == set(endpoints)  # none missing (it would show the key), none left over
+
+
 def unfenced_lines(text: str) -> list[tuple[int, str]]:
     """(line number, line) for every line outside a fenced code block."""
     keep, fenced = [], False
@@ -590,6 +654,8 @@ def test_the_writeup_gives_the_cost_break_even_and_latency_from_the_results(stan
     repo.render("writeup")
     text = repo.read("docs/writeup.md")
     assert "608,333 to 304,167" in text and "$0.0139" in text and "$0.600 to $1.20" in text
+    # groq-qwen3.8-27b has no cached-input price, so both ends of its cost and its break-even are the same figure
+    assert re.search(rf"\| `{QWEN_27B}` \| paid list price \| (\$[\d.,]+) to \1 \| ([\d,]+) to \2 \|", text)
     assert "rented around the clock for 730 hours at the on-demand price ($0.5 an hour) costs $365.00 a month" in text
     assert "one GPU serves 26,280,000 calls a month" in text
     assert "answers in 0.40 s at p50 and 0.60 s at p95 for a single stream, and 1.20 s at p95 under load" in text
@@ -666,7 +732,7 @@ def test_systems_without_results_are_listed_and_the_rest_still_render(tmp_path, 
     monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
     lab = Lab(tmp_path / "lab")
     lab.write_run(FT)
-    lab.write_run(MINI)
+    lab.write_run(GPT_OSS_20B)
     lab.write_audit()
     lab.write_subsets()
     comparison_for(lab)
@@ -674,9 +740,10 @@ def test_systems_without_results_are_listed_and_the_rest_still_render(tmp_path, 
     repo.render("readme", "writeup")
     region = repo.region()
     rows = accuracy_rows(region)
-    assert rows[BASE][2] == "no results yet" and rows[FULLER][2] == "no results yet" and rows[MINI][2].endswith("]")
-    assert f"Not compared yet, because they have no results: `{BASE}`, `{FULLER}`, `{GROQ}`." in region
-    assert "### Cost and break-even" in region and f"| `{MINI}` | paid list price |" in region  # what can be priced still is
+    assert all(rows[name][2] == "no results yet" for name in (BASE, GPT_OSS_120B, QWEN_27B, GEMINI))
+    assert rows[GPT_OSS_20B][2].endswith("]")
+    assert f"Not compared yet, because they have no results: `{BASE}`, `{GPT_OSS_120B}`, `{QWEN_27B}`, `{GEMINI}`." in region
+    assert "### Cost and break-even" in region and f"| `{GPT_OSS_20B}` | paid list price |" in region  # what can be priced still is
     assert f"| `{FT}` |" not in region.split("### Cost and break-even")[1].split("###")[0]  # no benchmark: no self-hosted cost row
 
 
@@ -685,7 +752,7 @@ def test_warnings_from_the_comparison_are_shown(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
     lab = Lab(tmp_path / "lab")
     lab.write_run(FT)
-    lab.write_run(MINI, models=lambda position: "model-a" if position <= 100 else "model-b")
+    lab.write_run(GPT_OSS_20B, models=lambda position: "model-a" if position <= 100 else "model-b")
     lab.write_audit()
     lab.write_subsets()
     doc = comparison_for(lab)
@@ -702,13 +769,13 @@ def test_a_partial_system_says_how_many_items_it_has(tmp_path, monkeypatch):
     lab = Lab(tmp_path / "lab")
     ids = lab.ids("S500")
     lab.write_run(FT)
-    lab.write_run(MINI, ids=ids[:200])
+    lab.write_run(GPT_OSS_20B, ids=ids[:200])
     lab.write_audit()
     lab.write_subsets()
     comparison_for(lab)
     repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
     repo.render("readme")
-    assert accuracy_rows(repo.region())[MINI][1] == "S500 (200 of 500)"
+    assert accuracy_rows(repo.region())[GPT_OSS_20B][1] == "S500 (200 of 500)"
 
 
 # --- errors -------------------------------------------------------------------------------------------------------------------------
