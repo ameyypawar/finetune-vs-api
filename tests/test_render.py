@@ -556,13 +556,18 @@ def test_without_a_log_the_card_says_these_are_planned_settings(standard, tmp_pa
     assert "revision not pinned yet" in repo.read("hf/README.md")
 
 
-def test_a_pinned_adapter_replaces_the_placeholder(standard, tmp_path):
+def test_a_published_adapter_replaces_the_placeholder(standard, tmp_path):
     lab, _ = standard
     repo = Repo.with_results(tmp_path / "repo", lab)
     path = repo.path("configs/systems.yaml")
     systems = yaml.safe_load(path.read_text())
-    systems["systems"][FT]["checkpoint"].update({"adapter": "me/qwen3-massive-lora", "epoch": 2})
+    systems["systems"][FT]["checkpoint"].update({"adapter": "adapters/epoch-2", "epoch": 2})
     path.write_text(yaml.safe_dump(systems, sort_keys=False))
+    repo.render("card")
+    unpublished = repo.read("hf/README.md")
+    # the locked row's checkpoint is a path inside the training output: never shown to readers as a location
+    assert "adapters/epoch-2" not in unpublished and "placeholder until the adapter is published" in unpublished
+    repo.path("configs/release.yaml").write_text("adapter_repo: me/qwen3-massive-lora\n")
     repo.render("card")
     card = repo.read("hf/README.md")
     assert "--lora-modules ft-qwen3-4b-lora=me/qwen3-massive-lora" in card and 'PeftModel.from_pretrained(model, "me/qwen3-massive-lora")' in card

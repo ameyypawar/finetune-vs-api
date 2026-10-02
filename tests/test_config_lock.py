@@ -324,6 +324,9 @@ def test_every_api_row_can_be_locked_as_shipped(env, system):
 
 
 def test_an_incomplete_system_cannot_be_locked(env):
+    # the shipped config pins the checkpoint (results/serving/dev_select.json); take it out and the row is blocked
+    edit(env, "systems.yaml", "adapter: adapters/epoch-2 # path", "adapter: null # path")
+    edit(env, "systems.yaml", "epoch: 2 # which saved epoch", "epoch: null # which saved epoch")
     blockers = {b.split(" ")[0] for b in config.lock_blockers(LOCAL, config_dir=env.config_dir)}
     assert {"checkpoint.adapter", "checkpoint.epoch"} <= blockers
     assert "checkpoint.base_revision" not in blockers  # pinned in configs/systems.yaml
@@ -334,7 +337,7 @@ def test_an_incomplete_system_cannot_be_locked(env):
     edit(env, "systems.yaml", "base_revision: cdbee75f17c01a7cc42f958dc650907174af0554 # Hugging Face commit", "base_revision: null # Hugging Face commit")
     assert "checkpoint.base_revision" in {b.split(" ")[0] for b in config.lock_blockers(LOCAL, config_dir=env.config_dir)}
     # fill the checkpoint in and it locks
-    edit(env, "systems.yaml", "adapter: null # path or repo of the chosen adapter\n      epoch: null # which saved epoch won on dev\n      base_revision: null # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507", "adapter: kaggle/out/epoch-2\n      epoch: 2\n      base_revision: deadbeef")
+    edit(env, "systems.yaml", "adapter: null # path or repo of the chosen adapter\n      epoch: null # which saved epoch won on dev (results/serving/dev_select.json)\n      base_revision: null # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507", "adapter: kaggle/out/epoch-2\n      epoch: 2\n      base_revision: deadbeef")
     assert not config.lock_blockers(LOCAL, config_dir=env.config_dir)
     assert lock(env, LOCAL, "full")["system"] == LOCAL
 
@@ -365,6 +368,7 @@ def test_lock_script_write_and_show(env):
     text = "\n".join(lines)
     assert "LOCKED" in text and "NOT LOCKED" not in text and "history:" in text
     lines.clear()
+    edit(env, "systems.yaml", "adapter: adapters/epoch-2 # path", "adapter: null # path")  # the shipped config pins it
     assert script.run(show=True, **kw) == 0
     assert "BLOCKED: checkpoint.adapter" in "\n".join(lines) and "NOT LOCKED" in "\n".join(lines)
 
@@ -375,6 +379,7 @@ def test_lock_script_errors(env):
     kw = {"config_dir": env.config_dir, "processed_dir": env.processed, "lock_path": env.lock, "out": lines.append}
     assert script.run(write=True, system=API, **kw) == 2  # no reason
     assert script.run(write=True, system="nope", reason="x", **kw) == 2
+    edit(env, "systems.yaml", "adapter: adapters/epoch-2 # path", "adapter: null # path")  # the shipped config pins it
     assert script.run(write=True, system=LOCAL, reason="x", subset="full", **kw) == 2  # blocked
     assert script.run(**kw) == 2
     assert any("unknown system" in line for line in lines)

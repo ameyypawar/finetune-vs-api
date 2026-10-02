@@ -43,6 +43,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import jinja2
+import yaml
 
 from finetune_vs_api import config, cost, metrics, prompts
 
@@ -71,6 +72,11 @@ READING = {
 }
 STATUS_TEXT = {"missing": "no results yet", "unreadable": "results unreadable"}
 ADAPTER_PLACEHOLDER = "<adapter repo id or local path>"
+#: Where the adapter is published, once it is: `adapter_repo` in configs/release.yaml, a file that does not exist
+#: until the upload. It is kept out of configs/systems.yaml on purpose: the fine-tuned row is locked, and publishing
+#: must not change a locked row. Its checkpoint.adapter is a path inside the training output, not a location for
+#: readers.
+RELEASE_FILE = "release.yaml"
 MODEL_INDEX_METRICS = (
     ("exact_match", "exact_match", "Exact match"),
     ("intent_accuracy", "accuracy", "Intent accuracy"),
@@ -84,6 +90,14 @@ class RenderError(ValueError):
 
 # --- formatting ---------------------------------------------------------------------------------
 
+
+
+def published_adapter(config_dir: Path) -> str | None:
+    """`adapter_repo` from configs/release.yaml, or None before the adapter is published."""
+    path = Path(config_dir) / RELEASE_FILE
+    if not path.is_file():
+        return None
+    return (yaml.safe_load(path.read_text()) or {}).get("adapter_repo") or None
 
 def _signed(value: float, digits: int = 1) -> str:
     rounded = round(value, digits) or 0.0  # never "-0.0"
@@ -542,7 +556,7 @@ def build_context(root: Path, results_dir: Path, config_dir: Path, *, need_datas
         "training": training,
         "ft": {
             "name": reference, "model": ft_spec["model"], "params": ft_spec["params"],
-            "adapter": checkpoint.get("adapter") or ADAPTER_PLACEHOLDER, "adapter_pinned": bool(checkpoint.get("adapter")),
+            "adapter": published_adapter(config_dir) or ADAPTER_PLACEHOLDER, "adapter_pinned": bool(published_adapter(config_dir)),
             "epoch": checkpoint.get("epoch"), "base_url": endpoint["base_url"],
             "instruction": prompts.FINETUNED_INSTRUCTION,
         },

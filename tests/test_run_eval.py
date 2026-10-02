@@ -191,7 +191,6 @@ def test_the_request_is_built_from_the_chosen_prompt_with_train_only_examples(wo
 
 
 def test_the_fine_tuned_prompt_is_two_messages_and_sends_no_schema(world):
-    world.edit_systems("adapter: null # path or repo of the chosen adapter", "adapter: out/epoch-2")
     outcome = world.run(LOCAL_FT, "dev", subset="D50")
     body = world.bodies[0]
     assert [m["role"] for m in body["messages"]] == ["system", "user"]

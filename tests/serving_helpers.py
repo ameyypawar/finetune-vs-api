@@ -253,6 +253,9 @@ class Lab:
         self.processed = build_processed(self.snapshot / "data")
         (self.snapshot / "results").mkdir()
         self.config_dir = self.snapshot / "configs"
+        # the state before dev-select: the shipped config pins the chosen checkpoint; these tests pin it themselves
+        self.edit_re("systems.yaml", r"(?m)^(      adapter: )\S+", r"\g<1>null")
+        self.edit_re("systems.yaml", r"(?m)^(      epoch: )\S+", r"\g<1>null")
         self.lock_path = self.snapshot / "results" / "test_lock.jsonl"
         self.epochs = list(range(1, epochs + 1))
         for epoch in self.epochs:
@@ -288,9 +291,9 @@ class Lab:
 
     def pin_checkpoint(self, epoch: int = 2, revision: str = REVISION) -> None:
         """What the user does after dev-select: fill the two checkpoint blocks in systems.yaml."""
-        self.edit("systems.yaml", "adapter: null # path or repo of the chosen adapter\n      epoch: null # which saved epoch won on dev\n",
-                  f"adapter: adapters/epoch-{epoch}\n      epoch: {epoch}\n")
-        self.edit_re("systems.yaml", r"(?m)^(      base_revision: )\S+", rf"\g<1>{revision}")  # both local rows
+        self.edit_re("systems.yaml", r"(?m)^(      adapter: ).*$", rf"\g<1>adapters/epoch-{epoch}")
+        self.edit_re("systems.yaml", r"(?m)^(      epoch: ).*$", rf"\g<1>{epoch}")
+        self.edit_re("systems.yaml", r"(?m)^(      base_revision: ).*$", rf"\g<1>{revision}")  # both local rows
 
     def lock_all(self, subsets=LOCKED_SUBSETS, systems=(FT, BASE)) -> None:
         for system in systems:

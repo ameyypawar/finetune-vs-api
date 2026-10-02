@@ -35,6 +35,13 @@ total equalled prompt plus completion and took about as long as with more thinki
   25 days. Gemini 3.5 Flash-Lite's free tier is reported at 500 requests per day for September 2026
   (<https://www.scriptbyai.com/gemini-api-free-tier-limits/>). The 14 dev items gemini-3.8-flash answered
   before the cap are not part of the results.
+- **2026-10-02, dev selection.** The first dev-select run on Kaggle could not start vLLM: on a T4 it picks
+  FlashInfer, whose kernels could not be linked in Kaggle's image (`ld: cannot find -lcuda`), so it fell back to
+  plain transformers, one request at a time, which measures accuracy but not throughput. A second run with a
+  Triton-attention rung (`vllm-lora-triton`) served every variant with vLLM. Both runs chose epoch 2, with nearly
+  the same dev scores (exact match 0.729 and 0.730 for epoch 2; 0.707 and 0.707 for epoch 1; 0.667 and 0.666 for
+  the base row): `results/serving/dev_select.json` is the second run, `dev_select_v1_hf_transformers.json` the
+  first. Test runs of the self-hosted rows use the second run's serving path.
 
 ## Metrics
 

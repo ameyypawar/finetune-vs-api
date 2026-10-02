@@ -1,0 +1,134 @@
+{
+  "system": "ft-qwen3-4b-lora",
+  "split": "dev",
+  "subset": {
+    "name": "full",
+    "n": 2033,
+    "hash": "6f2dce34afd8a50c36c2e4a20147fe285660054585a447c9e9a74441f7c7c385"
+  },
+  "status": "complete",
+  "stop": null,
+  "n_scored": 2033,
+  "n_calls_failed": 0,
+  "limit": null,
+  "resumed": false,
+  "billing_basis": "free tier; priced at paid list price",
+  "prompt": {
+    "name": "finetuned_v1",
+    "hash": "c496beb361a47e698a3027e6b37ddecf0145608647f453adad4097f5aefdbedd"
+  },
+  "config_hash": "ed588cf3fc3ab53068f7a9afec845643176522a5c1546b81e42fed92584bb9e6",
+  "config_components": {
+    "prompt": "c496beb361a47e698a3027e6b37ddecf0145608647f453adad4097f5aefdbedd",
+    "schema": "5e2268508be3b063a5b20dee6acad733a618d30ca936e0198b6c4497080e6526",
+    "system": "0d45c44b686967116819f2236372904cf7aefce8c70d4329d6dfeb873bd2a54d",
+    "decoding": "26b0e0189ccdc2a3d04591ac848d471f4c02a6ad507184f0dfca899527581b12",
+    "checkpoint": "259c22943fe35a6e955272ba107e28e90fbbbfc29e6f34aab3c6b3c696686ac3",
+    "prices": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "dataset": "006820b6b7e8c3b6cf36d8ebc4f6fbf4745ff0e02c4605a3cf5ffe7f4a91be29"
+  },
+  "git_commit": null,
+  "git_dirty": null,
+  "created_at": "2026-10-02T10:48:44Z",
+  "lock": null,
+  "endpoint": {
+    "name": "local",
+    "base_url": "http://127.0.0.1:8000/v1",
+    "model_requested": "ft-qwen3-4b-lora-epoch-1",
+    "models_returned": {
+      "ft-qwen3-4b-lora-epoch-1": 2033
+    },
+    "tier": null
+  },
+  "decoding": {
+    "params": {
+      "temperature": 0,
+      "max_tokens": 256
+    },
+    "drop_params": [],
+    "strict_json_schema_sent": false
+  },
+  "metrics": {
+    "n": 2033,
+    "exact_match": {
+      "value": 0.7073290703394,
+      "ci95": [
+        0.6871618298081653,
+        0.7274963108706345
+      ]
+    },
+    "intent_accuracy": {
+      "value": 0.8962124938514511,
+      "ci95": [
+        0.88293162813576,
+        0.9094933595671422
+      ]
+    },
+    "slot_precision": {
+      "value": 0.8100250626566416,
+      "ci95": [
+        0.7911540868794109,
+        0.8284000072605541
+      ]
+    },
+    "slot_recall": {
+      "value": 0.8031809145129225,
+      "ci95": [
+        0.7845703581138544,
+        0.8213929807639635
+      ]
+    },
+    "slot_f1": {
+      "value": 0.8065884701771899,
+      "ci95": [
+        0.7894329534514056,
+        0.8230940949956506
+      ]
+    },
+    "schema_valid_rate": {
+      "value": 0.9970486965076242,
+      "ci95": [
+        0.9945892769306444,
+        0.9990162321692081
+      ]
+    },
+    "unfound_value_rate": {
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    "slot_counts": {
+      "tp": 1616,
+      "fp": 379,
+      "fn": 396
+    },
+    "predicted_slots": 1995
+  },
+  "latency_s": {
+    "p50": 1.509523726999987,
+    "p95": 2.7582572810001693,
+    "n": 2033,
+    "method": "nearest-rank",
+    "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+  },
+  "tokens": {
+    "calls_with_reported_usage": 2033,
+    "calls_with_estimated_usage": 0,
+    "calls_without_usage": 0
+  },
+  "cost": {
+    "billing_basis": "free tier; priced at paid list price",
+    "note": "no API price for this system; self-hosted cost comes from the throughput benchmark"
+  },
+  "calls": {
+    "finish_reasons": {
+      "stop": 2033
+    },
+    "errors_by_kind": {},
+    "retries_total": 0,
+    "last_ratelimit_headers": {}
+  },
+  "predictions": "epoch-1/runs/ft-qwen3-4b-lora__dev/predictions.jsonl"
+}

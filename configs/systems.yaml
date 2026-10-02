@@ -63,8 +63,8 @@ systems:
     test_subset: full
     price_id: null
     checkpoint:
-      adapter: null # path or repo of the chosen adapter
-      epoch: null # which saved epoch won on dev
+      adapter: adapters/epoch-2 # path or repo of the chosen adapter
+      epoch: 2 # which saved epoch won on dev (results/serving/dev_select.json)
       base_revision: cdbee75f17c01a7cc42f958dc650907174af0554 # Hugging Face commit of Qwen/Qwen3-4B-Instruct-2507
     params:
       temperature: 0

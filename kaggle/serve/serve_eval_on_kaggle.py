@@ -84,7 +84,8 @@ What it does, in order, stopping at the first thing that is wrong:
     * puts the CUDA toolkit's link-time stub of the driver library (stubs/libcuda.so) on LIBRARY_PATH
       for every server it starts. Kaggle's image has none on the linker's path, so on 2026-10-02 the
       first dev-select run could not link FlashInfer's kernels ("ld: cannot find -lcuda"), and every
-      faster path fell through to hf-transformers;
+      faster path fell through to hf-transformers. On the second run no stub was found there either and
+      vllm-lora failed the same way; vllm-lora-triton is the path that ran;
     * serves the model on 127.0.0.1:8000, as configs/systems.yaml's local endpoint says: that
       address is part of the test lock.
 

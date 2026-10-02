@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "mode": "dev-select",
+  "created_at": "2026-10-02T10:24:02Z",
+  "rule": "highest exact match on the full dev split (point estimate); a tie goes to the earlier epoch",
+  "chosen": {
+    "epoch": 2,
+    "variant": "epoch-2",
+    "exact_match": 0.7289719626168224,
+    "correct": 1482,
+    "adapter": "adapters/epoch-2",
+    "adapter_sha256": "abbaf3638ea2b62a47c16123e805ce0960fd800dd72c2573f30126918a54e143"
+  },
+  "scores": [
+    {
+      "variant": "base",
+      "system": "base-qwen3-4b-k10",
+      "model": "Qwen/Qwen3-4B-Instruct-2507",
+      "epoch": null,
+      "n_scored": 2033,
+      "n_calls_failed": 0,
+      "correct": 1356,
+      "exact_match": 0.6669945892769307,
+      "exact_match_ci95": [
+        0.6463354648303,
+        0.6871618298081653
+      ],
+      "intent_accuracy": 0.8780127889818002,
+      "slot_f1": 0.7678571428571428,
+      "schema_valid_rate": 0.9945892769306444,
+      "summary": "results/dev-select/base/runs/base-qwen3-4b-k10__dev/summary.full.json"
+    },
+    {
+      "variant": "epoch-1",
+      "system": "ft-qwen3-4b-lora",
+      "model": "ft-qwen3-4b-lora-epoch-1",
+      "epoch": 1,
+      "n_scored": 2033,
+      "n_calls_failed": 0,
+      "correct": 1437,
+      "exact_match": 0.706837186424004,
+      "exact_match_ci95": [
+        0.6866699458927693,
+        0.7270044269552386
+      ],
+      "intent_accuracy": 0.8962124938514511,
+      "slot_f1": 0.8063872255489023,
+      "schema_valid_rate": 0.9970486965076242,
+      "summary": "results/dev-select/epoch-1/runs/ft-qwen3-4b-lora__dev/summary.full.json"
+    },
+    {
+      "variant": "epoch-2",
+      "system": "ft-qwen3-4b-lora",
+      "model": "ft-qwen3-4b-lora-epoch-2",
+      "epoch": 2,
+      "n_scored": 2033,
+      "n_calls_failed": 0,
+      "correct": 1482,
+      "exact_match": 0.7289719626168224,
+      "exact_match_ci95": [
+        0.7092966060009838,
+        0.7486473192326611
+      ],
+      "intent_accuracy": 0.9040826364977865,
+      "slot_f1": 0.8301148863358592,
+      "schema_valid_rate": 0.9980324643384161,
+      "summary": "results/dev-select/epoch-2/runs/ft-qwen3-4b-lora__dev/summary.full.json"
+    }
+  ],
+  "adapters": {
+    "1": {
+      "adapter": "adapters/epoch-1",
+      "sha256": "f96b343147ef7def799536e11b954e20f8c08d98ebcf8e92c653fa93e0dab0bb",
+      "rank": 16
+    },
+    "2": {
+      "adapter": "adapters/epoch-2",
+      "sha256": "abbaf3638ea2b62a47c16123e805ce0960fd800dd72c2573f30126918a54e143",
+      "rank": 16
+    }
+  },
+  "base_model": "Qwen/Qwen3-4B-Instruct-2507",
+  "base_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "dev_split_items": 2033,
+  "serving": {
+    "path": "hf-transformers",
+    "engine": "transformers",
+    "engine_version": "5.0.0",
+    "dtype": "float16",
+    "quantization": null,
+    "weights": "the adapter merged into fp16 weights, run with transformers one request at a time",
+    "throughput_measured": false,
+    "vllm_pin": null,
+    "packages": {
+      "vllm": "0.11.2",
+      "torch": "2.10.0+cu128",
+      "transformers": "5.0.0"
+    },
+    "attempts": [
+      {
+        "path": "vllm-lora",
+        "status": "failed",
+        "reason": "vllm-lora exited with status 1 before it was ready. Last lines of vllm-lora.log:\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m                 ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/utils/func_utils.py\", line 116, in inner\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     return fn(*args, **kwargs)\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m            ^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py\", line 203, in from_vllm_config\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     return cls(\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m            ^^^^\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py\", line 133, in __init__\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     self.engine_core = EngineCoreClient.make_async_mp_client(\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 121, in make_async_mp_client\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     return AsyncMPClient(*client_args)\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 808, in __init__\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     super().__init__(\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 469, in __init__\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     with launch_core_engines(vllm_config, executor_class, log_stats) as (\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/usr/lib/python3.12/contextlib.py\", line 144, in __exit__\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     next(self.gen)\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/utils.py\", line 907, in launch_core_engines\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     wait_for_engine_startup(\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/utils.py\", line 964, in wait_for_engine_startup\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m     raise RuntimeError(\n\u001b[1;36m(APIServer pid=104)\u001b[0;0m RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}"
+      },
+      {
+        "path": "vllm-merged",
+        "status": "failed",
+        "reason": "vllm-merged-base exited with status 1 before it was ready. Last lines of vllm-merged-base.log:\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m                 ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/utils/func_utils.py\", line 116, in inner\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     return fn(*args, **kwargs)\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m            ^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py\", line 203, in from_vllm_config\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     return cls(\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m            ^^^^\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/async_llm.py\", line 133, in __init__\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     self.engine_core = EngineCoreClient.make_async_mp_client(\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 121, in make_async_mp_client\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     return AsyncMPClient(*client_args)\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 808, in __init__\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     super().__init__(\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/core_client.py\", line 469, in __init__\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     with launch_core_engines(vllm_config, executor_class, log_stats) as (\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/usr/lib/python3.12/contextlib.py\", line 144, in __exit__\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     next(self.gen)\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/utils.py\", line 907, in launch_core_engines\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     wait_for_engine_startup(\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m   File \"/tmp/serve-eval/vllm-env/lib/python3.12/site-packages/vllm/v1/engine/utils.py\", line 964, in wait_for_engine_startup\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m     raise RuntimeError(\n\u001b[1;36m(APIServer pid=893)\u001b[0;0m RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}"
+      },
+      {
+        "path": "llamacpp-gguf",
+        "status": "failed",
+        "reason": "`cmake -S /tmp/serve-eval/llama.cpp-b7200 -B /tmp/serve-eval/llama.cpp-b7200/build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75 -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF` exited 1. Last lines of build-llama-cpp.log:\n-- CUDA host compiler is GNU 11.4.0\n-- Including CUDA backend\n-- ggml version: 0.9.4\n-- ggml commit:  unknown\nCMake Warning at common/CMakeLists.txt:32 (message):\n  Git repository not found; to enable automatic generation of build info,\n  make sure Git is installed and the project is a Git repository.\n\n\n-- Configuring done (4.4s)\nCMake Error at ggml/src/ggml-cuda/CMakeLists.txt:118 (target_link_libraries):\n  Target \"ggml-cuda\" links to:\n\n    CUDA::cuda_driver\n\n  but the target was not found.  Possible reasons include:\n\n    * There is a typo in the target name.\n    * A find_package call is missing for an IMPORTED target.\n    * An ALIAS target is missing.\n\n\n\n-- Generating done (0.4s)\nCMake Generate step failed.  Build files cannot be regenerated correctly."
+      },
+      {
+        "path": "hf-transformers",
+        "status": "ok",
+        "reason": null
+      }
+    ]
+  },
+  "probes": [
+    {
+      "variant": "base",
+      "model": "Qwen/Qwen3-4B-Instruct-2507",
+      "ok": true,
+      "why": "8 probe answers look sane"
+    },
+    {
+      "variant": "epoch-1",
+      "model": "ft-qwen3-4b-lora-epoch-1",
+      "ok": true,
+      "why": "8 probe answers look sane"
+    },
+    {
+      "variant": "epoch-2",
+      "model": "ft-qwen3-4b-lora-epoch-2",
+      "ok": true,
+      "why": "8 probe answers look sane"
+    }
+  ],
+  "training": {
+    "train_log_found": true,
+    "gpu": {
+      "name": "Tesla T4",
+      "memory": "15360 MiB",
+      "compute_capability": "7.5",
+      "driver": "580.178.04"
+    },
+    "adapters": [
+      {
+        "epoch": 1,
+        "path": "/kaggle/working/adapters/epoch-1",
+        "global_step": 720
+      },
+      {
+        "epoch": 2,
+        "path": "/kaggle/working/adapters/epoch-2",
+        "global_step": 1440
+      }
+    ]
+  },
+  "gpu": {
+    "name": "Tesla T4",
+    "memory": "15360 MiB",
+    "compute_capability": "7.5",
+    "driver": "580.178.04"
+  },
+  "snapshot_files": {
+    "configs/data.yaml": "ac827f1277400fda6e24f8c35929b5dce9bb57a2cb7fa255c99da269d0dc4318",
+    "configs/sources.yaml": "35dfdafa38d11ff0f1e2b4c58212e7db69534a1272a97e5af079760fbdffb883",
+    "configs/systems.yaml": "3264f38524bb55008c3d383e47e81d75b6eb51aa1cffc44df2e318ad600a3d26",
+    "configs/train.yaml": "5402c183e9adba4fdc02caf70153ccb41fe39c0db19686e564b90e6d65742a0a",
+    "data/processed/dev.jsonl": "aeeb65b11046ca03d7db6427b98d84068f133c45122beb5b91ad8afb36b57d14",
+    "data/processed/sft_dev.jsonl": "1dd2d0e5d6cfa48f21c868448d36c194a703915d17252a60db485f2e788b8996",
+    "data/processed/sft_train.jsonl": "97418d8f03494a2b4422dc4745237cec5d886890ac8f995e32547f76eb24eb9c",
+    "data/processed/test.jsonl": "f5aa55238b946087e9811e687d274d51756c10705bc00b647cf1ac47c184ba82",
+    "data/processed/train.jsonl": "e1bf40a263eaa53cfb5ab44c27bcb23278441cd2cd78b55aec97f8f5bd20a5db",
+    "data/processed/subsets.json": "442b301f76bc8fa93f263305a696ee9a93a7579e90d2a9d2bbc209e5d33163ab",
+    "results/test_lock.jsonl": "85627e2d101dccf7e0c06010ec908822d188be9a4a085860cd450823bb8c3629"
+  }
+}

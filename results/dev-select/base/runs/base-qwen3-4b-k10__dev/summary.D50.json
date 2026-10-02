@@ -1,0 +1,134 @@
+{
+  "system": "base-qwen3-4b-k10",
+  "split": "dev",
+  "subset": {
+    "name": "D50",
+    "n": 50,
+    "hash": "5af16349743833ae66595cf9a2920c43033ede6a8a0c53ae1f3178bde41a8fe3"
+  },
+  "status": "complete",
+  "stop": null,
+  "n_scored": 50,
+  "n_calls_failed": 0,
+  "limit": null,
+  "resumed": true,
+  "billing_basis": "free tier; priced at paid list price",
+  "prompt": {
+    "name": "fewshot_k10_v1",
+    "hash": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c"
+  },
+  "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+  "config_components": {
+    "prompt": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c",
+    "schema": "5e2268508be3b063a5b20dee6acad733a618d30ca936e0198b6c4497080e6526",
+    "system": "a3968bd350cbb7b63b8ed2bedc3721eaab7fef7e49419bce226a37aebb410663",
+    "decoding": "26b0e0189ccdc2a3d04591ac848d471f4c02a6ad507184f0dfca899527581b12",
+    "checkpoint": "d652b9ff1dc904bacb4ed955752052b5a5ee9f2671bca9637dc4cc1990307010",
+    "prices": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "dataset": "006820b6b7e8c3b6cf36d8ebc4f6fbf4745ff0e02c4605a3cf5ffe7f4a91be29"
+  },
+  "git_commit": null,
+  "git_dirty": null,
+  "created_at": "2026-10-02T11:15:20Z",
+  "lock": null,
+  "endpoint": {
+    "name": "local",
+    "base_url": "http://127.0.0.1:8000/v1",
+    "model_requested": "Qwen/Qwen3-4B-Instruct-2507",
+    "models_returned": {
+      "Qwen/Qwen3-4B-Instruct-2507": 50
+    },
+    "tier": null
+  },
+  "decoding": {
+    "params": {
+      "temperature": 0,
+      "max_tokens": 256
+    },
+    "drop_params": [],
+    "strict_json_schema_sent": false
+  },
+  "metrics": {
+    "n": 50,
+    "exact_match": {
+      "value": 0.82,
+      "ci95": [
+        0.72,
+        0.92
+      ]
+    },
+    "intent_accuracy": {
+      "value": 0.94,
+      "ci95": [
+        0.86,
+        1.0
+      ]
+    },
+    "slot_precision": {
+      "value": 0.7884615384615384,
+      "ci95": [
+        0.6458165322580647,
+        0.9230769230769231
+      ]
+    },
+    "slot_recall": {
+      "value": 0.8541666666666666,
+      "ci95": [
+        0.7115384615384616,
+        0.9714285714285714
+      ]
+    },
+    "slot_f1": {
+      "value": 0.8200000000000001,
+      "ci95": [
+        0.6909090909090909,
+        0.9307081853223489
+      ]
+    },
+    "schema_valid_rate": {
+      "value": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    "unfound_value_rate": {
+      "value": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    "slot_counts": {
+      "tp": 41,
+      "fp": 11,
+      "fn": 7
+    },
+    "predicted_slots": 52
+  },
+  "latency_s": {
+    "p50": 3.9082976509998844,
+    "p95": 8.116671550999854,
+    "n": 50,
+    "method": "nearest-rank",
+    "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+  },
+  "tokens": {
+    "calls_with_reported_usage": 50,
+    "calls_with_estimated_usage": 0,
+    "calls_without_usage": 0
+  },
+  "cost": {
+    "billing_basis": "free tier; priced at paid list price",
+    "note": "no API price for this system; self-hosted cost comes from the throughput benchmark"
+  },
+  "calls": {
+    "finish_reasons": {
+      "stop": 50
+    },
+    "errors_by_kind": {},
+    "retries_total": 0,
+    "last_ratelimit_headers": {}
+  },
+  "predictions": "base/runs/base-qwen3-4b-k10__dev/predictions.jsonl"
+}
