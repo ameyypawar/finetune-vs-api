@@ -1,0 +1,119 @@
+{# docs/writeup.md: a draft of the write-up, generated. Prose only; every number, table and sentence
+   about a result comes from scripts/render.py. The hand-written error analysis lives in
+   docs/error_analysis.md and is included where the slot is, so re-rendering never overwrites it. #}
+# A small fine-tune against API models, on one narrow task
+
+## The question
+
+Can a LoRA fine-tune of a small open model match API models on a narrow, well-specified task, and what does each cost to run? The task is to turn a request into one JSON function call: an intent (one of {{ dataset.n_intents }}) and slots (each one of {{ dataset.n_slot_types }} types, its value copied from the request). The data is the English part of {{ dataset.name }} {{ dataset.version }}: {{ dataset.n_train | count }} train, {{ dataset.n_dev | count }} dev and {{ dataset.n_test | count }} test requests.
+
+## The setup
+
+The comparison has {{ systems | length }} systems:
+
+{% for s in systems %}
+- `{{ s.name }}`: {% if s.name == reference %}{{ base_model.name }} plus the LoRA adapter{% else %}{{ s.model }}{% endif %}, prompt `{{ s.prompt }}` ({{ s.prompt_note }}), {{ s.where }}.
+{% endfor %}
+
+The fine-tune is a LoRA adapter (rank {{ training.lora.r }}, alpha {{ training.lora.alpha }}, {{ training.epochs }} epochs{% if training.source != "log" %}, as planned: no training run has finished yet{% endif %}) fitted to the human-labelled train split only; no API output is a label. The API systems run on free tiers with daily request caps, so every system is scored on a fixed, seeded test subset, stratified by scenario:{% for name, info in dataset.subsets.items() if info.split == "test" %} {{ name }} ({{ info.n | count }} items{% if info.parent %}, inside {{ info.parent }}{% endif %}){{ "," if not loop.last else "." }}{% endfor %} Each system's configuration must be locked, with a reason, before the runner will touch the test split. {% if has_results %}{{ table_notice }}{% else %}No money is spent on the API systems: their costs are computed at paid list prices.{% endif +%}
+
+## Results
+
+{% if has_results %}
+{{ tables.accuracy_compact }}
+
+{% if figures.accuracy %}
+![Exact match against cost per 1,000 calls](../{{ figures.accuracy }})
+
+{% endif %}
+A system beats another only where the interval of the paired difference excludes zero. {{ finding_summary }}{% for note in subset_notes %} {{ note }}{% endfor %}{% if ft_facts and ft_facts.full_em %} On the full test split the fine-tune scores {{ ft_facts.full_em }} ({{ ft_facts.full_n | count }} items).{% endif %}
+
+{% else %}
+No test run has been compared yet. Once the runs exist, `scripts/compare.py` writes the numbers and this section shows a table with each system's exact match and a {{ bootstrap.confidence | pct(0) }} interval, the difference from the fine-tune with a paired interval, and a figure of exact match against cost per 1,000 calls on a logarithmic axis. Every system is scored on the same fixed subsets, so a difference is a difference on the same items, not on different samples. The wording rule is fixed in advance: a system beats another only where the interval of the paired difference excludes zero, and anything else is reported as no significant difference.
+{% endif %}
+
+## Where the gap comes from
+
+{% if has_results %}
+Where each system loses points, by metric:
+
+{% for line in gap_lines %}
+- {{ line }}
+{% endfor %}
+{% if ft_facts and ft_facts.unseen %}
+
+Without the {{ ft_facts.unseen.excluded }} {{ ft_facts.subset }} items whose text also occurs in train, the fine-tune scores {{ ft_facts.unseen.em }} on {{ ft_facts.unseen.n }} items.
+{% endif %}
+{% if ft_facts and ft_facts.weakest %}
+
+The fine-tune's weakest scenario on {{ ft_facts.subset }} is {{ ft_facts.weakest.name }} ({{ ft_facts.weakest.em }}, {{ ft_facts.weakest.n }} items); cells this small are noisy.
+{% endif %}
+{% else %}
+Exact match needs the intent and every slot right. Once results exist, this section splits it into intent accuracy, slot F1, the schema-valid rate and the share of slot values that are not in the request, gives exact match without the test items whose text also occurs in train, and names the fine-tune's weakest scenario. The error analysis that follows is written by hand from sampled errors.
+{% endif %}
+
+### Error analysis
+
+{% if error_analysis_text %}
+{{ error_analysis_text }}
+{% elif error_analysis %}
+{{ error_analysis.n | count }} errors are labelled by hand in `{{ error_analysis.path }}`{% if error_analysis.categories %}, by category: {% for name, n in error_analysis.categories %}{{ name }} ({{ n }}){{ ", " if not loop.last else "" }}{% endfor %}{% endif %}. Write what they show in `docs/error_analysis.md`; it is included here.
+{% else %}
+This is the slot for the hand-labelled error analysis: the errors go in `results/error_analysis.csv`, with a `category` column that is counted here, and the reading of them goes in `docs/error_analysis.md`, which is included here. Until it is written, the draft makes no claim about why the systems differ.
+{% endif %}
+
+## Cost and break-even
+
+{% if has_results and tables.cost is defined %}
+{{ tables.cost }}
+
+{% if gpu %}
+A {{ gpu.label }} instance rented around the clock for {{ hours_per_month }} hours at the {{ gpu.price_basis }} price ({{ gpu.usd_per_hour }} an hour) costs {{ gpu.monthly }} a month. Break-even is the monthly volume above which the rental costs less.{% if ft_facts and ft_facts.capacity %} At the operating point ({{ ft_facts.op_concurrency }} concurrent requests, {{ ft_facts.op_rps }} requests/s) one GPU serves {{ ft_facts.capacity }} calls a month{% if ft_facts.p50_1 %}; the fine-tune answers in {{ ft_facts.p50_1 }} at p50 and {{ ft_facts.p95_1 }} at p95 for a single stream, and {{ ft_facts.p95_op }} at p95 under load{% endif %}.{% endif %} Self-hosted cost assumes a GPU kept busy; an idle one costs proportionally more.
+{% endif %}
+{% else %}
+API costs are computed from tokens at the providers' paid list prices, as a no-caching bound and a bound with the static prompt prefix cached. Self-hosted cost comes from throughput measured on Kaggle's free T4, priced at the on-demand rate for renting the same GPU on AWS (g4dn.xlarge). The break-even is the monthly volume at which a GPU rented around the clock ({{ hours_per_month }} hours at the on-demand price) costs less than each API, given that one GPU can serve that volume. The self-hosted figure is the price with the GPU kept fully busy; an idle or half-used GPU costs proportionally more. Self-hosted latency is measured on the box: p50 and p95 for a single stream of requests, and p95 at the operating point. API latency goes to the appendix.
+{% endif %}
+
+## Why now
+
+OpenAI's deprecations page ({{ deprecations.url }}, retrieved {{ deprecations.retrieved_on }}) lists these dates for fine-tuned models, evals and new fine-tuning jobs:
+
+{% for event in deprecations.events %}
+- {{ "On" if event.relation == "on" else "From" }} {{ event.date }}: {{ event.what }}
+{% endfor %}
+
+An open-weights fine-tune that its owner serves does not depend on a provider's schedule.
+
+## Limits
+
+- The test subsets are samples: small differences are not resolved{% if ft_facts %} (the fine-tune's exact match is plus or minus {{ ft_facts.em_half_width }} on {{ ft_facts.subset }}{% if ft_facts.full_half_width %} and {{ ft_facts.full_half_width }} on the full split{% endif %}{% if pair_half_width_max %}; paired differences carry up to plus or minus {{ pair_half_width_max }}{% endif %}){% endif %}.
+- Each system runs once, at temperature {{ ft.params.temperature }}, so run-to-run variance is not measured.
+- API rows run on free tiers and are priced at list prices, which can change; their latency, where shown, is {{ api_latency_label }}.
+- Self-hosted cost assumes the throughput measured on {{ (gpu and gpu.benchmark_gpu) or "the benchmark GPU" }} carries over to the rented {{ (gpu and gpu.label) or "GPU" }}.
+- {{ dataset.name }} has been public since {{ citations.massive_year }} and an MTEB mirror redistributes its test text, so any model may have seen it; {{ dataset.n_test_text_in_train }} test items also occur in train.
+
+## Reproduce
+
+```bash
+python scripts/prepare_data.py
+python scripts/make_subsets.py
+python scripts/lock_test.py --write --system NAME --reason "why now"
+python scripts/run_eval.py --system NAME --split test
+python scripts/bench_throughput.py --help
+python scripts/compare.py && python scripts/make_figures.py
+python scripts/render.py --target all
+```
+
+Definitions are in `docs/method.md`.
+
+## Appendix: API latency
+
+{% if api_latency %}
+Latency of the API systems, {{ api_latency_label }}:
+
+{% for name, entry in api_latency.items() %}
+- `{{ name }}`: p50 {{ "%.2f" | format(entry.p50) }} s, p95 {{ "%.2f" | format(entry.p95) }} s over {{ entry.n | count }} calls.
+{% endfor %}
+{% else %}
+API latency will be listed here once the runs exist: {{ api_latency_label }}.
+{% endif %}

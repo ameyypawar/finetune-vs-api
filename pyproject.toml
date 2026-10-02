@@ -18,6 +18,9 @@ dependencies = [
     "httpx>=0.27",
     "fastembed>=0.7",
     "tiktoken>=0.9",
+    # the results pipeline: scripts/render.py (templates) and scripts/make_figures.py (figures)
+    "jinja2>=3.1",
+    "matplotlib>=3.9",
 ]
 
 [project.optional-dependencies]

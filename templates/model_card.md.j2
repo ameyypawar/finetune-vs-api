@@ -1,0 +1,196 @@
+{# hf/README.md: the model card for the LoRA adapter. The YAML header uses the Hugging Face model-card
+   metadata (license, base_model, library_name, datasets, language, model-index). Scalars go through
+   the `yaml` filter, which writes JSON strings, and JSON strings are valid YAML. Every number comes
+   from the context; the evaluation table is built by scripts/render.py. #}
+---
+license: apache-2.0
+base_model: {{ base_model.name | yaml }}
+library_name: peft
+pipeline_tag: text-generation
+language:
+- en
+datasets:
+- {{ hub_dataset_id | yaml }}
+tags:
+- lora
+- peft
+- function-calling
+- intent-detection
+- slot-filling
+{% if model_index %}
+model-index:
+- name: {{ ft.name | yaml }}
+  results:
+{% for entry in model_index %}
+  - task:
+      type: text-generation
+      name: Text generation
+    dataset:
+      name: {{ entry.dataset_name | yaml }}
+      type: {{ hub_dataset_id | yaml }}
+      config: {{ dataset.locale | yaml }}
+      split: test
+    metrics:
+{% for metric in entry.metrics %}
+    - type: {{ metric.type | yaml }}
+      name: {{ metric.name | yaml }}
+      value: {{ metric.value }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+---
+
+# {{ ft.name }}
+
+A LoRA adapter for [{{ base_model.name }}](https://huggingface.co/{{ base_model.name }}) that turns a free-text request into one JSON function call: an intent, and a list of slots whose values are copied from the request. It was trained on the English (`{{ dataset.locale }}`) part of {{ dataset.name }} {{ dataset.version }}, which has {{ dataset.n_intents }} intents and {{ dataset.n_slot_types }} slot types.
+
+```
+"wake me up at nine am on friday"
+  -> {"intent": "alarm_set", "slots": [{"type": "time", "value": "nine am"}, {"type": "date", "value": "friday"}]}
+```
+
+The adapter only works together with its base model. It is not a general chat model. It was compared with API models in the finetune-vs-api repository, whose `docs/method.md` defines every metric below.
+
+{% if not has_results %}
+**Evaluation results are not in yet.** This card is generated from the repository's results directory, so the table and the metadata above fill in once the test runs have been compared.
+
+{% endif %}
+## Use
+
+The prompt must be the one it was trained with: a system message holding the one-line instruction below, then the request as the user message, with nothing added.
+
+### With vLLM
+
+```bash
+vllm serve {{ base_model.name }} \
+  --enable-lora \
+  --lora-modules {{ ft.model }}={{ ft.adapter }} \
+  --max-lora-rank {{ training.lora.r }}
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="{{ ft.base_url }}", api_key="unused")
+reply = client.chat.completions.create(
+    model="{{ ft.model }}",
+    messages=[
+        {"role": "system", "content": "{{ ft.instruction }}"},
+        {"role": "user", "content": "wake me up at nine am on friday"},
+    ],
+    temperature={{ ft.params.temperature }},
+    max_tokens={{ ft.params.max_tokens }},
+)
+print(reply.choices[0].message.content)
+```
+
+### With transformers and peft
+
+```python
+import json
+
+from peft import PeftModel
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+base = "{{ base_model.name }}"
+tokenizer = AutoTokenizer.from_pretrained(base)
+model = AutoModelForCausalLM.from_pretrained(base, dtype="auto", device_map="auto")
+model = PeftModel.from_pretrained(model, "{{ ft.adapter }}")
+model.eval()
+
+messages = [
+    {"role": "system", "content": "{{ ft.instruction }}"},
+    {"role": "user", "content": "wake me up at nine am on friday"},
+]
+inputs = tokenizer.apply_chat_template(
+    messages, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt"
+).to(model.device)
+output = model.generate(**inputs, max_new_tokens={{ ft.params.max_tokens }}, do_sample=False)
+reply = tokenizer.decode(output[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+print(json.loads(reply))
+```
+
+Older transformers releases call the `dtype` argument `torch_dtype`. Decoding is greedy (temperature {{ ft.params.temperature }}). The reply is parsed as plain JSON: text around the object, or more than one object, counts as a failure to follow the format.
+{% if not ft.adapter_pinned %}
+
+The adapter location above is a placeholder until the adapter is published.
+{% endif %}
+
+## Training details
+
+{% if training.source == "log" %}
+Read from the training log (`results/train_log.json`, written by `kaggle/train_on_kaggle.py`).
+{% else %}
+No training run has finished yet. These are the planned settings from `configs/train.yaml`, not the record of a run.
+{% endif %}
+
+- Base model: `{{ base_model.name }}`{% if training.base_revision %}, revision `{{ training.base_revision }}`{% else %}, revision not pinned yet{% endif %}.
+- Method: LoRA with rank {{ training.lora.r }}, alpha {{ training.lora.alpha }} and dropout {{ training.lora.dropout }}, on {{ training.lora.target_modules | join(", ") }}{% if training.load_in_4bit %}; the base weights were quantized while training (`load_in_4bit`, QLoRA){% endif %}.
+- Data: the train split of {{ dataset.name }} ({{ dataset.n_train | count }} requests) with its human labels, converted to chat records. Labels never come from an API model.
+- Optimisation: learning rate {{ training.learning_rate }}, {{ training.scheduler }} schedule with warmup ratio {{ training.warmup_ratio }}, weight decay {{ training.weight_decay }}, optimizer {{ training.optim }}, {{ training.epochs }} epochs, batch size {{ training.batch_size }} with {{ training.grad_accum }} gradient accumulation steps, maximum sequence length {{ training.max_seq_length }}, seed {{ training.seed }}.
+{% if training.source == "log" %}
+{% if training.precision %}
+- Precision: {{ training.precision }}.
+{% endif %}
+{% if training.gpu %}
+- Hardware: {{ training.gpu }}{% if training.elapsed_minutes %}, {{ training.elapsed_minutes }} minutes{% endif %}.
+{% endif %}
+{% if training.train_loss is not none %}
+- Final training loss {{ "%.4f" | format(training.train_loss) }}{% if training.eval_losses %}; validation loss {% for epoch, value in training.eval_losses %}{{ "%.4f" | format(value) }} after epoch {{ epoch | int }}{{ ", " if not loop.last else "" }}{% endfor %}{% endif %}.
+{% endif %}
+{% if training.adapters %}
+- An adapter was saved after each of the epochs {{ training.adapters | join(", ") }}{% if ft.epoch %}; epoch {{ ft.epoch }} was chosen on the dev split{% else %}; the epoch is chosen on the dev split and pinned in `configs/systems.yaml`{% endif %}.
+{% endif %}
+{% if training.data %}
+- Training files: {% for name, info in training.data.items() %}`{{ name }}` ({{ info.records | count }} records, sha256 `{{ info.sha256 }}`){{ "; " if not loop.last else "" }}{% endfor %}.
+{% endif %}
+{% if training.packages %}
+- Packages: {% for name, version in training.packages.items() %}{{ name }} {{ version }}{{ ", " if not loop.last else "" }}{% endfor %}.
+{% endif %}
+{% endif %}
+
+## Evaluation
+
+{% if has_results %}
+Each system is scored on a fixed, seeded test subset stratified by scenario: {{ headline_subset }} ({{ subset_sizes[headline_subset] | count }} items), or a smaller nested one where the table says so. The self-hosted rows are also scored on the full test split. Intervals are {{ bootstrap.confidence | pct(0) }} percentile bootstraps. The difference is the system minus the fine-tune, with a paired bootstrap interval and an exact McNemar test; a system "beats" another only when that interval excludes zero.
+
+{{ tables.accuracy }}
+
+{% if ft_facts %}
+The fine-tune's exact match has a {{ bootstrap.confidence | pct(0) }} interval of plus or minus {{ ft_facts.em_half_width }} on {{ ft_facts.subset }}{% if ft_facts.full_half_width %} and {{ ft_facts.full_half_width }} on the full split{% endif %}.
+{% endif %}
+{% if warnings %}
+
+Warnings from the comparison:
+
+{% for warning in warnings %}
+- {{ warning }}
+{% endfor %}
+{% endif %}
+{% else %}
+The evaluation compares this adapter with the untuned base model and with API models on a fixed test subset, using paired bootstrap intervals and an exact McNemar test. The table will appear here once the test runs exist.
+{% endif %}
+
+## Limitations
+
+- English only: the training and the evaluation use the `{{ dataset.locale }}` part of {{ dataset.name }}. Other languages, other domains and spoken input were not tested.
+- The labels are fixed: {{ dataset.n_intents }} intents and {{ dataset.n_slot_types }} slot types. A request outside them still gets one of them.
+- Slot values are meant to be copied from the request, but a model can emit a value that is not in it{% if ft_facts %}; the share of predicted slot values missing from the request is in `results/comparison.json`{% endif %}. Nothing constrains the decoding by default, so the output can fail to follow the JSON format; the schema-valid rate is reported next to the task metrics.
+- {{ dataset.name }} has been public since {{ citations.massive_year }}, and an MTEB mirror of it redistributes the test text, so the base model may have seen the test items. The data also repeats: {{ dataset.n_test_text_in_train }} test items have text that also occurs in train, which the evaluation reports separately.
+- The comparison covers one task, one run per system and subsets of the test split, so small differences are not resolved. `docs/method.md` has the details, including how throughput and cost were measured.
+
+## License and attribution
+
+The adapter is released under the license named in the header. The base model, {{ base_model.name }}, is published by the Qwen team under {{ base_model.license }} and is not part of this repository. This is an independent project, not endorsed by Amazon, the SLURP authors or the Qwen team.
+
+Change made: the base model was fine-tuned with LoRA on data derived from {{ dataset.name }} {{ dataset.version }}, in which MASSIVE's `[label : value]` annotations were converted to JSON function calls, keeping MASSIVE's train, dev and test partition.
+
+The data is released by Amazon under {{ dataset.license }}. Its English text comes from SLURP, which carries the same license (see `NOTICE.md` in the repository). Please cite both.
+
+```bibtex
+{{ citations.massive }}
+```
+
+```bibtex
+{{ citations.slurp }}
+```

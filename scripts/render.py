@@ -1,0 +1,746 @@
+"""Render the generated parts of the documentation from the results and the configs.
+
+    python scripts/render.py --target readme|card|writeup|all [--check]
+
+    readme    the region of README.md between <!-- results:start --> and <!-- results:end -->
+              (templates/readme_results.md.j2). Nothing else in README.md is touched.
+    card      hf/README.md, the model card for the adapter (templates/model_card.md.j2)
+    writeup   docs/writeup.md, a draft of the write-up (templates/writeup.md.j2)
+
+Every number in the output comes from a file: results/comparison.json (scripts/compare.py),
+results/data_audit.json, results/subsets.json, results/train_log.json, configs/*.yaml, NOTICE.md,
+or the code. The templates hold prose and no figures; tests/test_render.py fails if a template
+types a number. The output has no date or time in it, so rendering twice gives the same bytes.
+
+Every table is followed by the same notice, with the source URLs and the dates they were read on,
+because the tables are only ever built by `md_table` here, which adds it.
+
+With no results (no results/comparison.json, or one in which no system has been scored) the README
+region is empty, so README.md stays exactly as it is committed. The card and the write-up are then
+drafts that say the results are pending.
+
+Optional inputs: results/train_log.json (training details for the card), results/error_analysis.csv
+(a `category` column is counted), and docs/error_analysis.md (prose included verbatim in the
+write-up, so a hand-written error analysis survives re-rendering).
+
+--check writes nothing. It exits 1 and names each file whose generated content differs from what
+is on disk (CI runs it), and 0 when they are all current.
+
+Exit status: 0 written or current; 1 --check found stale files; 2 an input is missing or unusable.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import re
+import sys
+from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+import jinja2
+
+from finetune_vs_api import config, cost, metrics, prompts
+
+RESULTS_START = "<!-- results:start -->"
+RESULTS_END = "<!-- results:end -->"
+TARGETS = ("readme", "card", "writeup")
+TEMPLATES = {"readme": "readme_results.md.j2", "card": "model_card.md.j2", "writeup": "writeup.md.j2"}
+OUTPUTS = {"readme": "README.md", "card": "hf/README.md", "writeup": "docs/writeup.md"}
+FIGURES = {"accuracy": "results/figures/accuracy_vs_cost.png", "latency": "results/figures/latency.png"}
+COMPARISON_SCHEMA_VERSION = 1
+EXIT_STALE = 1
+EXIT_ERROR = 2
+
+#: Printed under every table, with the sources. The wording is the project's, not a result.
+TABLE_NOTICE = "All API rows ran on free tiers; no money was spent; costs are at paid list prices."
+#: The label on API latency; the same words as scripts/compare.py writes into comparison.json (a test keeps them equal).
+API_LATENCY_LABEL = "observed on free tiers from India; not representative of paid tiers"
+#: The reference system when there is no comparison to name one; the same as scripts/compare.py (a test keeps them equal).
+DEFAULT_REFERENCE = "ft-qwen3-4b-lora"
+HUB_DATASET_ID = "AmazonScience/massive"  # the Hugging Face Hub id of MASSIVE, for the card's metadata
+ENDPOINT_NAMES = {"local": "a local server", "github-models": "GitHub Models", "groq": "Groq"}
+READING = {
+    "system_beats_reference": "beats the fine-tune",
+    "reference_beats_system": "the fine-tune beats it",
+    "no_significant_difference": "no significant difference",
+}
+STATUS_TEXT = {"missing": "no results yet", "unreadable": "results unreadable"}
+ADAPTER_PLACEHOLDER = "<adapter repo id or local path>"
+MODEL_INDEX_METRICS = (
+    ("exact_match", "exact_match", "Exact match"),
+    ("intent_accuracy", "accuracy", "Intent accuracy"),
+    ("slot_f1", "f1", "Slot F1"),
+)
+
+
+class RenderError(ValueError):
+    """An input is missing or unusable, or a template needs something it was not given."""
+
+
+# --- formatting ---------------------------------------------------------------------------------
+
+
+def _signed(value: float, digits: int = 1) -> str:
+    rounded = round(value, digits) or 0.0  # never "-0.0"
+    return f"{rounded:+.{digits}f}"
+
+
+def pct(value: float, digits: int = 1) -> str:
+    return f"{value * 100:.{digits}f}%"
+
+
+def pct_interval(entry: Mapping[str, Any], digits: int = 1) -> str:
+    """`91.2% [88.6, 93.4]` from a {"value", "ci95"} entry."""
+    low, high = entry["ci95"]
+    return f"{pct(entry['value'], digits)} [{low * 100:.{digits}f}, {high * 100:.{digits}f}]"
+
+
+def pp(value: float, digits: int = 1) -> str:
+    return f"{_signed(value * 100, digits)} pp"
+
+
+def pp_interval(entry: Mapping[str, Any]) -> str:
+    """`-3.2 pp [-6.0, -0.4]` from a {"value", "ci95"} difference."""
+    low, high = entry["ci95"]
+    return f"{pp(entry['value'])} [{_signed(low * 100)}, {_signed(high * 100)}]"
+
+
+def half_width(entry: Mapping[str, Any]) -> str:
+    """Half the width of an interval, in percentage points: `2.6 pp`."""
+    low, high = entry["ci95"]
+    return f"{(high - low) / 2 * 100:.1f} pp"
+
+
+def usd(value: float) -> str:
+    """Dollars with the digits a cost of that size needs: $383.98, $1.20, $0.600, $0.0139."""
+    if value >= 1:
+        return f"${value:,.2f}"
+    return f"${value:.3f}" if value >= 0.1 else f"${value:.4f}"
+
+
+def count(value: float) -> str:
+    return f"{round(value):,}"
+
+
+def seconds(value: float) -> str:
+    return f"{value:.2f} s"
+
+
+def p_value(value: float) -> str:
+    return "<0.001" if value < 0.001 else f"{value:.3f}"
+
+
+def yaml_str(value: Any) -> str:
+    """A scalar for a YAML header. JSON strings are valid YAML, which keeps every quoting rule out of the template."""
+    return json.dumps(str(value), ensure_ascii=False)
+
+
+def _cell(text: Any) -> str:
+    return str(text).replace("|", "\\|").replace("\n", " ")
+
+
+# --- the notice and the tables ---------------------------------------------------------------------------
+
+
+def table_notice(doc: Mapping[str, Any]) -> str:
+    """The sentence under every table: the basis of the costs, and where the prices were read."""
+    sources = doc.get("sources") or {}
+    parts = [TABLE_NOTICE]
+    prices = {entry["url"]: entry["retrieved_on"] for entry in (sources.get("prices") or {}).values()}
+    if prices:
+        parts.append("Prices: " + ", ".join(f"<{url}> (retrieved {day})" for url, day in prices.items()) + ".")
+    gpu = sources.get("gpu_rental")
+    if gpu:
+        parts.append(f"GPU rental: <{gpu['url']}> (retrieved {gpu['retrieved_on']}).")
+    return "*" + " ".join(parts) + "*"
+
+
+def md_table(doc: Mapping[str, Any], headers: Sequence[str], rows: Sequence[Sequence[Any]], align: str) -> str:
+    """A markdown table followed by the notice. `align` has one letter per column: l (left) or r (right)."""
+    if len(align) != len(headers):
+        raise ValueError(f"{len(headers)} columns but align={align!r}")
+    rules = ["---" if a == "l" else "---:" for a in align]
+    lines = ["| " + " | ".join(_cell(h) for h in headers) + " |", "|" + "|".join(rules) + "|"]
+    lines += ["| " + " | ".join(_cell(c) for c in row) + " |" for row in rows]
+    return "\n".join(lines) + "\n\n" + table_notice(doc)
+
+
+def _code(name: str) -> str:
+    return f"`{name}`"
+
+
+def accuracy_table(doc: Mapping[str, Any], *, compact: bool = False) -> str:
+    """Exact match per system, paired against the reference. `compact` drops the McNemar and full-split columns."""
+    rows = []
+    reference = doc["reference"]
+    for s in doc["systems"]:
+        name = _code(s["name"])
+        if not s["metrics"]:
+            rows.append([name, "-", STATUS_TEXT.get(s["status"], s["status"]), "-", "-", "-", "-"])
+            continue
+        pair = s["vs_reference"]
+        items = f"{s['comparison_subset']} ({s['n_scored']}"
+        if s["status"] == "partial":
+            items += f" of {s['n_subset']}"
+        if pair and pair["n"] != s["n_scored"]:
+            items += f", {pair['n']} paired"
+        items += ")"
+        full = s["full_test"]
+        rows.append(
+            [
+                name,
+                items,
+                pct_interval(s["metrics"]["exact_match"]),
+                pp_interval(pair["difference"]) if pair else ("reference" if s["name"] == reference else "-"),
+                p_value(pair["mcnemar"]["p_value"]) if pair else "-",
+                READING[pair["verdict"]["relation"]] if pair else ("reference" if s["name"] == reference else "-"),
+                f"{pct_interval(full['metrics']['exact_match'])} (n={full['n_scored']})" if full else "-",
+            ]
+        )
+    headers = ["System", "Items", "Exact match", "Difference from the fine-tune", "McNemar p", "Reading", "Full test split"]
+    align = "llrrrlr"
+    if compact:
+        keep = [0, 1, 2, 3, 5]
+        headers, align = [headers[i] for i in keep], "".join(align[i] for i in keep)
+        rows = [[row[i] for i in keep] for row in rows]
+    return md_table(doc, headers, rows, align)
+
+
+def cost_table(doc: Mapping[str, Any]) -> str | None:
+    rows = []
+    be = (doc.get("break_even") or {}).get("apis", {})
+    for s in doc["systems"]:
+        c = s["cost"]
+        if not c:
+            continue
+        if s["kind"] == "api":
+            bounds = c["per_1k_calls_usd"]
+            volumes = be.get(s["name"], {}).get("calls_per_month", {})
+            volume_cell = "-"
+            if volumes.get("cached_prefix") is not None and volumes.get("no_caching") is not None:
+                volume_cell = f"{count(volumes['cached_prefix'])} to {count(volumes['no_caching'])}"
+            rows.append([_code(s["name"]), "paid list price", f"{usd(bounds['lower'])} to {usd(bounds['upper'])}", volume_cell])
+        else:
+            rows.append([_code(s["name"]), "GPU rental at the on-demand price, kept busy", usd(c["per_1k_calls_usd"]), "-"])
+    if not rows:
+        return None
+    headers = ["System", "Priced as", "Cost per 1,000 calls (cached prefix to no caching)", "Break-even calls per month (same order)"]
+    return md_table(doc, headers, rows, "llrr")
+
+
+def latency_table(doc: Mapping[str, Any]) -> str | None:
+    rows = []
+    for name, entry in doc["latency"]["self_hosted"]["systems"].items():
+        single, op = entry.get("concurrency_1") or {}, entry.get("operating_point") or {}
+        rows.append(
+            [
+                _code(name),
+                seconds(single["p50_s"]) if single.get("p50_s") is not None else "-",
+                seconds(single["p95_s"]) if single.get("p95_s") is not None else "-",
+                seconds(op["p95_s"]) if op.get("p95_s") is not None else "-",
+                f"concurrency {op['concurrency']}, {op['requests_per_s']:.1f} requests/s" if op else "-",
+            ]
+        )
+    if not rows:
+        return None
+    headers = ["System", "p50, concurrency 1", "p95, concurrency 1", "p95 at the operating point", "Operating point"]
+    return md_table(doc, headers, rows, "lrrrl")
+
+
+def api_latency_table(doc: Mapping[str, Any]) -> str | None:
+    rows = [
+        [_code(name), seconds(entry["p50"]), seconds(entry["p95"]), entry["n"]]
+        for name, entry in doc["latency"]["api_appendix"]["systems"].items()
+    ]
+    if not rows:
+        return None
+    return md_table(doc, ["System", "p50", "p95", "Calls"], rows, "lrrr")
+
+
+def other_metrics_table(doc: Mapping[str, Any]) -> str:
+    rows = []
+    for s in doc["systems"]:
+        m = s["metrics"]
+        if not m:
+            continue
+        unseen = s["unseen_text"]
+        rows.append(
+            [
+                _code(s["name"]),
+                pct(m["intent_accuracy"]["value"]),
+                pct(m["slot_f1"]["value"]),
+                pct(m["schema_valid_rate"]["value"]),
+                pct(m["unfound_value_rate"]["value"]),
+                f"{pct(unseen['value'])} (n={unseen['n']})" if unseen else "-",
+            ]
+        )
+    headers = ["System", "Intent accuracy", "Slot F1", "Schema-valid", "Slot values not in the request", "Exact match without items whose text is in train"]
+    return md_table(doc, headers, rows, "lrrrrr")
+
+
+def scenario_table(doc: Mapping[str, Any]) -> str | None:
+    scored = [s for s in doc["systems"] if s["per_scenario"]]
+    if not scored:
+        return None
+    scenarios = sorted({scenario for s in scored for scenario in s["per_scenario"]})
+    rows = []
+    for scenario in scenarios:
+        cells = []
+        for s in scored:
+            cell = s["per_scenario"].get(scenario)
+            cells.append(f"{pct(cell['exact_match'], 0)} ({cell['n']})" if cell else "-")
+        rows.append([scenario, *cells])
+    return md_table(doc, ["Scenario", *[_code(s["name"]) for s in scored]], rows, "l" + "r" * len(scored))
+
+
+# --- what the prose says --------------------------------------------------------------------------------------
+
+
+def by_name(doc: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    return {s["name"]: s for s in doc["systems"]}
+
+
+def _names(names: Sequence[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def finding_summary(doc: Mapping[str, Any]) -> str:
+    """One sentence on exact match: who the fine-tune beats, who beats it, who is level. Uses the wording rule."""
+    groups: dict[str, list[str]] = {"reference_beats_system": [], "system_beats_reference": [], "no_significant_difference": []}
+    for s in doc["systems"]:
+        if s["vs_reference"]:
+            groups[s["vs_reference"]["verdict"]["relation"]].append(_code(s["name"]))
+    parts = []
+    if groups["reference_beats_system"]:
+        parts.append(f"the fine-tune beats {_names(groups['reference_beats_system'])}")
+    if groups["system_beats_reference"]:
+        names = groups["system_beats_reference"]
+        parts.append(f"{_names(names)} {'beats' if len(names) == 1 else 'beat'} the fine-tune")
+    if groups["no_significant_difference"]:
+        parts.append(f"there is no significant difference with {_names(groups['no_significant_difference'])}")
+    return f"On exact match, {'; '.join(parts)}." if parts else ""
+
+
+def subset_notes(doc: Mapping[str, Any]) -> list[str]:
+    """Where a system is compared on a smaller subset than the headline one, what the fine-tune scores there."""
+    return [
+        f"On the {s['vs_reference']['subset']} items, where {_code(s['name'])} is compared, the fine-tune scores "
+        f"{pct_interval(s['vs_reference']['reference_exact_match'])}."
+        for s in doc["systems"]
+        if s["vs_reference"] and s["vs_reference"]["subset"] != doc["subsets"]["headline"]
+    ]
+
+
+def gap_lines(doc: Mapping[str, Any]) -> list[str]:
+    lines = []
+    for s in doc["systems"]:
+        m = s["metrics"]
+        if not m:
+            continue
+        lines.append(
+            f"{_code(s['name'])}: intent {pct(m['intent_accuracy']['value'])}, slot F1 {pct(m['slot_f1']['value'])}, "
+            f"schema-valid {pct(m['schema_valid_rate']['value'])}, values not in the request {pct(m['unfound_value_rate']['value'])}."
+        )
+    return lines
+
+
+def weakest_scenario(system: Mapping[str, Any]) -> dict[str, Any] | None:
+    cells = system.get("per_scenario") or {}
+    if not cells:
+        return None
+    name, cell = min(cells.items(), key=lambda kv: (kv[1]["exact_match"], kv[0]))
+    return {"name": name, "em": pct(cell["exact_match"]), "n": cell["n"]}
+
+
+# --- loading -----------------------------------------------------------------------------------------------------
+
+
+def read_json(path: Path) -> Any | None:
+    """Parsed JSON, or None when the file does not exist."""
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RenderError(f"{path} is not valid JSON: {exc}") from exc
+
+
+def load_comparison(results_dir: Path) -> dict[str, Any] | None:
+    """results/comparison.json, or None when there are no results to show."""
+    doc = read_json(results_dir / "comparison.json")
+    if doc is None:
+        return None
+    if not isinstance(doc, dict) or doc.get("schema_version") != COMPARISON_SCHEMA_VERSION:
+        raise RenderError(f"{results_dir / 'comparison.json'} has the wrong schema_version; run scripts/compare.py again")
+    return doc if doc.get("has_results") else None
+
+
+def read_citations(notice_path: Path) -> dict[str, str]:
+    """The MASSIVE and SLURP BibTeX entries, from NOTICE.md, which is where they are kept."""
+    try:
+        text = notice_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RenderError(f"cannot read {notice_path}: {exc}") from exc
+    blocks = re.findall(r"```\n(.*?)\n```", text, flags=re.DOTALL)
+    found = {
+        key: next((b.strip() for b in blocks if b.lstrip().startswith(start)), None)
+        for key, start in (("massive", "@misc{fitzgerald2022massive"), ("slurp", "@inproceedings{slurp"))
+    }
+    if not all(found.values()):
+        raise RenderError("NOTICE.md no longer holds the MASSIVE and SLURP BibTeX entries that the model card quotes")
+    year = re.search(r"year=\{(\d{4})\}", found["massive"])
+    return {**found, "massive_year": year.group(1) if year else ""}
+
+
+def read_error_analysis(results_dir: Path, docs_dir: Path) -> tuple[dict[str, Any] | None, str | None]:
+    summary = None
+    path = results_dir / "error_analysis.csv"
+    if path.exists():
+        with open(path, encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        categories = None
+        if rows and "category" in rows[0]:
+            counts: dict[str, int] = {}
+            for row in rows:
+                category = row["category"] or "(blank)"
+                counts[category] = counts.get(category, 0) + 1
+            categories = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        summary = {"path": "results/error_analysis.csv", "n": len(rows), "categories": categories}
+    prose = docs_dir / "error_analysis.md"
+    return summary, prose.read_text(encoding="utf-8").strip() if prose.exists() else None
+
+
+def training_view(train_cfg: Mapping[str, Any], log: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Training details: the planned configuration, replaced by what the training log recorded once it exists."""
+    lora, tr = train_cfg["lora"], train_cfg["training"]
+    view: dict[str, Any] = {
+        "source": "config",
+        "base_model": train_cfg["base_model"]["name"],
+        "base_revision": train_cfg["base_model"].get("revision"),
+        "lora": {"r": lora["r"], "alpha": lora["alpha"], "dropout": lora["dropout"], "target_modules": list(lora["target_modules_expanded"])},
+        "learning_rate": tr["learning_rate"], "epochs": tr["num_train_epochs"],
+        "batch_size": tr["per_device_train_batch_size"], "grad_accum": tr["gradient_accumulation_steps"],
+        "max_seq_length": tr["max_seq_length"], "seed": tr["seed"], "scheduler": tr["lr_scheduler_type"],
+        "warmup_ratio": tr["warmup_ratio"], "weight_decay": tr["weight_decay"], "optim": tr["optim"],
+        "load_in_4bit": tr["load_in_4bit"], "precision": None,
+        "gpu": None, "packages": None, "elapsed_minutes": None, "train_loss": None, "eval_losses": [], "data": None, "adapters": [],
+    }
+    if not log:
+        return view
+    c = log.get("config") or {}
+    lg = c.get("lora") or {}
+    view.update(
+        source="log",
+        base_model=log.get("base_model", view["base_model"]),
+        base_revision=log.get("base_revision", view["base_revision"]),
+        lora={"r": lg.get("r", lora["r"]), "alpha": lg.get("alpha", lora["alpha"]), "dropout": lg.get("dropout", lora["dropout"]),
+              "target_modules": list(lg.get("target_modules") or view["lora"]["target_modules"])},
+        learning_rate=c.get("learning_rate", view["learning_rate"]), epochs=c.get("epochs", view["epochs"]),
+        batch_size=c.get("per_device_batch_size", view["batch_size"]), grad_accum=c.get("gradient_accumulation_steps", view["grad_accum"]),
+        max_seq_length=c.get("max_seq_length", view["max_seq_length"]), seed=c.get("seed", view["seed"]),
+        scheduler=c.get("lr_scheduler_type", view["scheduler"]), warmup_ratio=c.get("warmup_ratio", view["warmup_ratio"]),
+        weight_decay=c.get("weight_decay", view["weight_decay"]), optim=c.get("optim", view["optim"]),
+        load_in_4bit=c.get("load_in_4bit", view["load_in_4bit"]), precision=c.get("precision"),
+        gpu=(log.get("gpu") or {}).get("name"), packages=log.get("packages"),
+        elapsed_minutes=round(log["elapsed_seconds"] / 60, 1) if log.get("elapsed_seconds") else None,
+        train_loss=(log.get("train_metrics") or {}).get("train_loss"),
+        eval_losses=[(h["epoch"], h["eval_loss"]) for h in log.get("log_history") or [] if "eval_loss" in h],
+        data={name: {"records": info.get("records"), "sha256": info.get("sha256")} for name, info in (log.get("data") or {}).items()},
+        adapters=[a.get("epoch") for a in log.get("adapters") or []],
+    )
+    return view
+
+
+def model_index(ft: Mapping[str, Any] | None, dataset: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The card's evaluation results for the adapter: the full split first, then the subset every system shares."""
+    if not ft or not ft["metrics"]:
+        return []
+    entries = []
+    scopes = []
+    if ft["full_test"]:
+        scopes.append((f"{dataset['name']} {dataset['version']} {dataset['locale']}, test split (n={ft['full_test']['n_scored']})", ft["full_test"]["metrics"]))
+    scopes.append((f"{dataset['name']} {dataset['version']} {dataset['locale']}, test subset {ft['comparison_subset']} (n={ft['n_scored']})", ft["metrics"]))
+    for label, m in scopes:
+        entries.append(
+            {"dataset_name": label, "metrics": [{"type": t, "name": n, "value": round(m[key]["value"], 4)} for key, t, n in MODEL_INDEX_METRICS]}
+        )
+    return entries
+
+
+# --- the context -----------------------------------------------------------------------------------------------------
+
+
+def _where(spec: Mapping[str, Any]) -> str:
+    if spec["endpoint"] == "local":
+        return "self-hosted"
+    return f"{ENDPOINT_NAMES.get(spec['endpoint'], spec['endpoint'])}, free tier"
+
+
+def _prompt_note(name: str) -> str:
+    spec = prompts.get_prompt(name)
+    if spec.k:
+        return f"{spec.k} retrieved examples"
+    return "label lists, no examples" if spec.uses_labels else "one-line instruction"
+
+
+def build_context(root: Path, results_dir: Path, config_dir: Path, *, need_dataset: bool = True) -> dict[str, Any]:
+    """Everything the templates may use. Nothing in it is a date or a time."""
+    try:
+        specs = {name: config.resolve_system(name, config_dir) for name in config.list_systems(config_dir)}
+        sources = config.load_yaml("sources", config_dir)
+        data_cfg = config.load_yaml("data", config_dir)
+        train_cfg = config.load_yaml("train", config_dir)
+    except (config.ConfigError, OSError, KeyError) as exc:
+        raise RenderError(f"cannot read the configs in {config_dir}: {exc}") from exc
+    comparison = load_comparison(results_dir)
+    reference = comparison["reference"] if comparison else DEFAULT_REFERENCE
+    if reference not in specs:
+        raise RenderError(f"the reference system {reference!r} is not in {config_dir / 'systems.yaml'}")
+    ft_spec = specs[reference]
+    audit = read_json(results_dir / "data_audit.json")
+    subsets_doc = read_json(results_dir / "subsets.json")
+    if need_dataset and (audit is None or subsets_doc is None):
+        missing = "results/data_audit.json" if audit is None else "results/subsets.json"
+        raise RenderError(f"{missing} not found; run scripts/prepare_data.py and scripts/make_subsets.py first")
+    log = read_json(results_dir / "train_log.json")
+    analysis, analysis_text = read_error_analysis(results_dir, root / "docs")
+    citations = read_citations(root / "NOTICE.md") if need_dataset else {}
+
+    dataset = None
+    if audit is not None and subsets_doc is not None:
+        src = data_cfg["source"]
+        dataset = {
+            "name": src["name"], "version": src["version"], "locale": data_cfg["locale"], "license": src["license"],
+            "n_train": audit["splits"]["train"], "n_dev": audit["splits"]["dev"], "n_test": audit["splits"]["test"],
+            "n_intents": audit["labels"]["intents"]["n_total"], "n_slot_types": audit["labels"]["slot_types"]["n_total"],
+            "n_test_text_in_train": len(audit["overlap"]["test_item_ids_in_train"]),
+            "subsets": {name: {"n": entry["n"], "split": entry["split"], "parent": entry["parent"]} for name, entry in subsets_doc["subsets"].items()},
+        }
+    systems = [
+        {
+            "name": name, "model": spec["model"], "prompt": spec["prompt"], "prompt_note": _prompt_note(spec["prompt"]),
+            "where": _where(spec),
+        }
+        for name, spec in specs.items()
+    ]
+    endpoint = endpoint_of(config_dir, ft_spec)
+    checkpoint = ft_spec.get("checkpoint") or {}
+    training = training_view(train_cfg, log)
+    ctx: dict[str, Any] = {
+        "has_results": comparison is not None,
+        "reference": reference,
+        "systems": systems,
+        "dataset": dataset,
+        "citations": citations,
+        "hub_dataset_id": HUB_DATASET_ID,
+        "base_model": {"name": train_cfg["base_model"]["name"], "license": train_cfg["base_model"]["license"]},
+        "training": training,
+        "ft": {
+            "name": reference, "model": ft_spec["model"], "params": ft_spec["params"],
+            "adapter": checkpoint.get("adapter") or ADAPTER_PLACEHOLDER, "adapter_pinned": bool(checkpoint.get("adapter")),
+            "epoch": checkpoint.get("epoch"), "base_url": endpoint["base_url"],
+            "instruction": prompts.FINETUNED_INSTRUCTION,
+        },
+        "deprecations": sources["openai_deprecations"],
+        "table_notice": TABLE_NOTICE,
+        "bootstrap": {"resamples": metrics.BOOTSTRAP_RESAMPLES, "confidence": 0.95},
+        "hours_per_month": cost.HOURS_PER_MONTH,
+        "error_analysis": analysis,
+        "error_analysis_text": analysis_text,
+        "figures": {key: (path if (root / path).exists() else None) for key, path in FIGURES.items()},
+        "tables": {},
+        "finding_summary": "",
+        "subset_notes": [],
+        "gap_lines": [],
+        "warnings": [],
+        "ft_facts": None,
+        "gpu": None,
+        "model_index": [],
+        "pair_half_width_max": None,
+        "headline_subset": None,
+        "subset_sizes": {},
+        "pending_names": "",
+        "api_latency": {},
+        "api_latency_label": API_LATENCY_LABEL,
+    }
+    if comparison:
+        ctx.update(comparison_context(comparison, dataset))
+    return ctx
+
+
+def endpoint_of(config_dir: Path, spec: Mapping[str, Any]) -> Mapping[str, Any]:
+    """The endpoint a system sends its requests to, from configs/systems.yaml."""
+    endpoints = config.load_yaml("systems", config_dir)["endpoints"]
+    return endpoints[spec["endpoint"]]
+
+
+def comparison_context(doc: Mapping[str, Any], dataset: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The parts of the context that exist only when there are results."""
+    named = by_name(doc)
+    ref = named.get(doc["reference"])
+    tables: dict[str, str] = {"accuracy": accuracy_table(doc), "accuracy_compact": accuracy_table(doc, compact=True), "other": other_metrics_table(doc)}
+    for key, table in (("cost", cost_table(doc)), ("latency", latency_table(doc)), ("api_latency", api_latency_table(doc)), ("scenario", scenario_table(doc))):
+        if table:
+            tables[key] = table
+    ft_facts = None
+    if ref and ref["metrics"]:
+        op = (doc["latency"]["self_hosted"]["systems"].get(ref["name"]) or {})
+        single, operating = op.get("concurrency_1") or {}, op.get("operating_point") or {}
+        full = ref["full_test"]
+        ft_facts = {
+            "subset": ref["comparison_subset"],
+            "em_half_width": half_width(ref["metrics"]["exact_match"]),
+            "full_n": full["n_scored"] if full else None,
+            "full_em": pct_interval(full["metrics"]["exact_match"]) if full else None,
+            "full_half_width": half_width(full["metrics"]["exact_match"]) if full else None,
+            "unseen": ref["unseen_text"] and {"n": ref["unseen_text"]["n"], "excluded": ref["unseen_text"]["excluded"], "em": pct_interval(ref["unseen_text"])},
+            "weakest": weakest_scenario(ref),
+            "p50_1": seconds(single["p50_s"]) if single.get("p50_s") is not None else None,
+            "p95_1": seconds(single["p95_s"]) if single.get("p95_s") is not None else None,
+            "p95_op": seconds(operating["p95_s"]) if operating.get("p95_s") is not None else None,
+            "op_concurrency": operating.get("concurrency"),
+            "op_rps": f"{operating['requests_per_s']:.1f}" if operating.get("requests_per_s") else None,
+            "capacity": count(ref["cost"]["capacity_calls_per_month"]) if ref["cost"] else None,
+        }
+    pair_widths = [(s["vs_reference"]["difference"]["ci95"][1] - s["vs_reference"]["difference"]["ci95"][0]) / 2 for s in doc["systems"] if s["vs_reference"]]
+    be = doc.get("break_even") or {}
+    gpu = be.get("gpu")
+    return {
+        "tables": tables,
+        "finding_summary": finding_summary(doc),
+        "subset_notes": subset_notes(doc),
+        "gap_lines": gap_lines(doc),
+        "warnings": list(doc["warnings"]),
+        "ft_facts": ft_facts,
+        "pair_half_width_max": f"{max(pair_widths) * 100:.1f} pp" if pair_widths else None,
+        "gpu": gpu and {
+            "label": gpu["gpu"], "usd_per_hour": f"${gpu['usd_per_hour']:g}", "monthly": usd(gpu["monthly_usd"]),
+            "price_basis": gpu["price_basis"].replace("_", "-"),
+            "benchmark_gpu": ((doc.get("self_hosted") or {}).get("benchmark") or {}).get("gpu"),
+        },
+        "api_latency_label": doc["latency"]["api_appendix"]["label"],
+        "api_latency": doc["latency"]["api_appendix"]["systems"],
+        "model_index": model_index(ref, dataset) if dataset else [],
+        "headline_subset": doc["subsets"]["headline"],
+        "subset_sizes": {name: info["n"] for name, info in doc["subsets"]["info"].items()},
+        "bootstrap": {"resamples": doc["bootstrap"]["resamples"], "confidence": doc["bootstrap"]["confidence"]},
+        "pending_names": ", ".join(_code(s["name"]) for s in doc["systems"] if not s["metrics"]),
+    }
+
+
+# --- templates -------------------------------------------------------------------------------------------------------
+
+
+def make_env(templates_dir: Path) -> jinja2.Environment:
+    # Plain markdown, not HTML, so there is nothing to escape. StrictUndefined: a template that
+    # asks for something the context does not have is an error, never an empty string.
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(templates_dir)),
+        undefined=jinja2.StrictUndefined,
+        trim_blocks=True,
+        lstrip_blocks=True,
+        keep_trailing_newline=True,
+        autoescape=False,
+    )
+    env.filters.update({"yaml": yaml_str, "pct": pct, "count": count, "usd": usd})
+    return env
+
+
+def render_template(env: jinja2.Environment, target: str, ctx: Mapping[str, Any]) -> str:
+    try:
+        return env.get_template(TEMPLATES[target]).render(**ctx)
+    except jinja2.TemplateNotFound as exc:
+        raise RenderError(f"template {exc.name} not found in {getattr(env.loader, 'searchpath', '?')}") from exc
+    except jinja2.UndefinedError as exc:
+        raise RenderError(f"{TEMPLATES[target]} needs something the context does not have: {exc.message}") from exc
+
+
+def splice_readme(text: str, body: str) -> str:
+    """README with the generated region replaced by `body`, set off by blank lines. An empty body leaves an empty region."""
+    if text.count(RESULTS_START) != 1 or text.count(RESULTS_END) != 1:
+        raise RenderError(f"README.md must contain exactly one {RESULTS_START} and one {RESULTS_END}")
+    head, rest = text.split(RESULTS_START, 1)
+    if RESULTS_END not in rest:
+        raise RenderError(f"{RESULTS_END} comes before {RESULTS_START} in README.md")
+    _, tail = rest.split(RESULTS_END, 1)
+    newline = "\r\n" if "\r\n" in text else "\n"
+    body = body.strip("\n").replace("\n", newline)
+    region = newline + (newline + body + newline + newline if body else "")
+    return head + RESULTS_START + region + RESULTS_END + tail
+
+
+def generate(target: str, root: Path, ctx: Mapping[str, Any], env: jinja2.Environment) -> str:
+    """The full content `target` should have."""
+    if target == "readme":
+        path = root / OUTPUTS["readme"]
+        try:
+            text = path.read_bytes().decode("utf-8")
+        except OSError as exc:
+            raise RenderError(f"cannot read {path}: {exc}") from exc
+        return splice_readme(text, render_template(env, "readme", ctx))
+    return render_template(env, target, ctx)
+
+
+# --- command line ------------------------------------------------------------------------------------------------------------
+
+
+def run(
+    targets: Sequence[str] = TARGETS,
+    *,
+    check: bool = False,
+    root: Path | None = None,
+    results_dir: Path | None = None,
+    config_dir: Path | None = None,
+    templates_dir: Path | None = None,
+    out: Callable[[str], None] = print,
+) -> int:
+    root = Path(root or config.REPO_ROOT)
+    results_dir = Path(results_dir or root / "results")
+    config_dir = Path(config_dir or root / "configs")
+    templates_dir = Path(templates_dir or root / "templates")
+    targets = list(dict.fromkeys(targets))
+    try:
+        ctx = build_context(root, results_dir, config_dir, need_dataset=any(t != "readme" for t in targets))
+        env = make_env(templates_dir)
+        planned = {t: generate(t, root, ctx, env) for t in targets}
+    except (RenderError, FileNotFoundError, OSError) as exc:
+        out(f"error: {exc}")
+        return EXIT_ERROR
+    stale, written = [], []
+    for target, content in planned.items():
+        path = root / OUTPUTS[target]
+        current = path.read_bytes() if path.exists() else None
+        encoded = content.encode("utf-8")
+        if current == encoded:
+            out(f"current: {OUTPUTS[target]}")
+        elif check:
+            stale.append(OUTPUTS[target])
+            out(f"STALE: {OUTPUTS[target]} ({'missing' if current is None else 'differs from what the results and templates produce'})")
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(encoded)
+            written.append(OUTPUTS[target])
+            out(f"wrote {OUTPUTS[target]}")
+    if stale:
+        out("run: python scripts/render.py --target all   (then commit the result)")
+        return EXIT_STALE
+    return 0
+
+
+def main(argv: list[str] | None = None, **overrides: Any) -> int:
+    """`overrides` go straight to `run` (another root, a quiet `out`)."""
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument("--target", required=True, choices=(*TARGETS, "all"), help="what to render")
+    parser.add_argument("--check", action="store_true", help="write nothing; exit 1 if a generated file is out of date")
+    args = parser.parse_args(argv)
+    targets = TARGETS if args.target == "all" else (args.target,)
+    return run(targets, check=args.check, **overrides)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

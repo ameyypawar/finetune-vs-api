@@ -30,3 +30,10 @@ jobs:
 
       - name: Lint
         run: .venv/bin/ruff check .
+
+      # The README results region, hf/README.md and docs/writeup.md are generated from the
+      # committed results and configs. This fails, naming the file, if one is out of date; fix it
+      # with `python scripts/render.py --target all` and commit the result. It reads only files
+      # in the repository, so it needs no dataset, no GPU and no API key.
+      - name: Generated docs are up to date
+        run: .venv/bin/python scripts/render.py --target all --check

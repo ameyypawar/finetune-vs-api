@@ -1,0 +1,73 @@
+{# The region of README.md between the results markers. Renders to nothing when there are no results,
+   which leaves README.md exactly as committed. Prose only: every number and every table comes from
+   scripts/render.py, which builds the tables and puts the notice under each one. #}
+{% if has_results %}
+### Exact match, paired against the fine-tune
+
+Every system is compared with `{{ reference }}` on the items both have answered: the {{ headline_subset }} subset ({{ subset_sizes[headline_subset] | count }} items), or the smaller subset a system ran on, as the Items column says. Intervals are {{ bootstrap.confidence | pct(0) }} percentile bootstraps ({{ bootstrap.resamples | count }} resamples). The difference is the system minus the fine-tune, with a paired bootstrap interval and an exact McNemar test. A system "beats" another only when the interval of the difference excludes zero; otherwise the reading is "no significant difference". The full test split is a secondary column for the self-hosted rows.
+
+{{ tables.accuracy }}
+
+{% if figures.accuracy %}
+![Exact match against cost per 1,000 calls, with a logarithmic cost axis]({{ figures.accuracy }})
+
+{% endif %}
+{% if tables.cost is defined %}
+### Cost and break-even
+
+Costs are what the same calls would cost at the providers' paid list prices, as a pair of bounds: with the static prompt prefix cached, and with no caching. The self-hosted cost is a rented GPU kept busy at the operating point. Break-even is the monthly volume above which a GPU rented around the clock ({{ hours_per_month }} hours a month, at the on-demand price) costs less than the API.
+
+{{ tables.cost }}
+
+{% endif %}
+{% if tables.latency is defined %}
+### Self-hosted latency
+
+Measured on the box, with no network in the path: p50 and p95 for a single stream of requests, and p95 at the operating point.
+
+{{ tables.latency }}
+
+{% if figures.latency %}
+![Self-hosted latency: p50 and p95 for a single stream of requests, p95 at the operating point]({{ figures.latency }})
+
+{% endif %}
+{% endif %}
+<details>
+<summary>Other metrics, exact match per scenario, and API latency</summary>
+
+#### Other metrics
+
+{{ tables.other }}
+
+{% if tables.scenario is defined %}
+#### Exact match per scenario
+
+Each cell is exact match, with the number of items in the scenario in brackets. Cells this small are noisy.
+
+{{ tables.scenario }}
+
+{% endif %}
+{% if tables.api_latency is defined %}
+#### Appendix: API latency
+
+Latency of the API systems, {{ api_latency_label }}.
+
+{{ tables.api_latency }}
+
+{% endif %}
+</details>
+{% if pending_names %}
+
+Not compared yet, because they have no results: {{ pending_names }}.
+{% endif %}
+{% if warnings %}
+
+#### Warnings from the comparison
+
+{% for warning in warnings %}
+- {{ warning }}
+{% endfor %}
+{% endif %}
+
+Definitions and caveats are in [docs/method.md](docs/method.md). Every number is in `results/comparison.json`.
+{% endif %}
