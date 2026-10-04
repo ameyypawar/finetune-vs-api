@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "mode": "test",
+  "created_at": "2026-10-02T12:37:43Z",
+  "serving": {
+    "path": "vllm-lora-triton",
+    "engine": "vllm",
+    "engine_version": "0.11.2",
+    "dtype": "float16",
+    "quantization": null,
+    "weights": "fp16 base weights, the LoRA adapter applied by vLLM at request time, with Triton attention",
+    "throughput_measured": true,
+    "vllm_pin": [
+      "vllm==0.11.2",
+      "transformers==4.56.2"
+    ],
+    "packages": {
+      "vllm": "0.11.2",
+      "torch": "2.9.0"
+    },
+    "attempts": [
+      {
+        "path": "vllm-lora-triton",
+        "status": "ok",
+        "reason": null
+      }
+    ]
+  },
+  "locks": {
+    "ft-qwen3-4b-lora": {
+      "full": {
+        "locked_at": "2026-10-02T11:27:23Z",
+        "reason": "Epoch 2 chosen on the full dev split by the rule fixed in advance (results/serving/dev_select.json): exact match 0.730, epoch 1 0.707. Served by vllm-lora-triton. No test request has been sent.",
+        "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+        "subset_hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8",
+        "git_commit": "815fdf69d5e165cb4ad8a60f152b54eb89c1ff76"
+      },
+      "S500": {
+        "locked_at": "2026-10-02T11:27:23Z",
+        "reason": "Epoch 2 chosen on the full dev split by the rule fixed in advance (results/serving/dev_select.json): exact match 0.730, epoch 1 0.707. Served by vllm-lora-triton. No test request has been sent.",
+        "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+        "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9",
+        "git_commit": "815fdf69d5e165cb4ad8a60f152b54eb89c1ff76"
+      },
+      "S300": {
+        "locked_at": "2026-10-02T11:27:23Z",
+        "reason": "Epoch 2 chosen on the full dev split by the rule fixed in advance (results/serving/dev_select.json): exact match 0.730, epoch 1 0.707. Served by vllm-lora-triton. No test request has been sent.",
+        "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+        "subset_hash": "fe0a93fdbcf29d45f697e726ef697bb84fd53d99a5d1e7ef8c8ff87627281118",
+        "git_commit": "815fdf69d5e165cb4ad8a60f152b54eb89c1ff76"
+      }
+    },
+    "base-qwen3-4b-k10": {
+      "full": {
+        "locked_at": "2026-10-02T11:27:23Z",
+        "reason": "Base row frozen with the dev selection (exact match 0.666 on the full dev split, ten retrieved examples). Served by vllm-lora-triton. No test request has been sent.",
+        "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+        "subset_hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8",
+        "git_commit": "815fdf69d5e165cb4ad8a60f152b54eb89c1ff76"
+      },
+      "S500": {
+        "locked_at": "2026-10-02T11:27:23Z",
+        "reason": "Base row frozen with the dev selection (exact match 0.666 on the full dev split, ten retrieved examples). Served by vllm-lora-triton. No test request has been sent.",
+        "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+        "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9",
+        "git_commit": "815fdf69d5e165cb4ad8a60f152b54eb89c1ff76"
+      },
+      "S300": {
+        "locked_at": "2026-10-02T11:27:23Z",
+        "reason": "Base row frozen with the dev selection (exact match 0.666 on the full dev split, ten retrieved examples). Served by vllm-lora-triton. No test request has been sent.",
+        "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+        "subset_hash": "fe0a93fdbcf29d45f697e726ef697bb84fd53d99a5d1e7ef8c8ff87627281118",
+        "git_commit": "815fdf69d5e165cb4ad8a60f152b54eb89c1ff76"
+      }
+    }
+  },
+  "adapter": {
+    "path": "adapters/epoch-2",
+    "epoch": 2,
+    "sha256": "abbaf3638ea2b62a47c16123e805ce0960fd800dd72c2573f30126918a54e143",
+    "dev_select": {
+      "record": "results/serving/dev_select.json",
+      "chosen_epoch": 2,
+      "locked_epoch": 2,
+      "sha256_matches": true
+    }
+  },
+  "base_model": "Qwen/Qwen3-4B-Instruct-2507",
+  "base_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "runs": {
+    "base-qwen3-4b-k10": {
+      "full": {
+        "summary": "results/runs/base-qwen3-4b-k10__test/summary.full.json",
+        "exact_match": {
+          "value": 0.6607262945527909,
+          "ci95": [
+            0.6439139206455952,
+            0.6775386684599866
+          ]
+        },
+        "n_scored": 2974,
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Base row frozen with the dev selection (exact match 0.666 on the full dev split, ten retrieved examples). Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+          "subset_hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8"
+        }
+      },
+      "S500": {
+        "summary": "results/runs/base-qwen3-4b-k10__test/summary.S500.json",
+        "exact_match": {
+          "value": 0.666,
+          "ci95": [
+            0.624,
+            0.708
+          ]
+        },
+        "n_scored": 500,
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Base row frozen with the dev selection (exact match 0.666 on the full dev split, ten retrieved examples). Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+          "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        }
+      },
+      "S300": {
+        "summary": "results/runs/base-qwen3-4b-k10__test/summary.S300.json",
+        "exact_match": {
+          "value": 0.6733333333333333,
+          "ci95": [
+            0.62,
+            0.7266666666666667
+          ]
+        },
+        "n_scored": 300,
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Base row frozen with the dev selection (exact match 0.666 on the full dev split, ten retrieved examples). Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+          "subset_hash": "fe0a93fdbcf29d45f697e726ef697bb84fd53d99a5d1e7ef8c8ff87627281118"
+        }
+      }
+    },
+    "ft-qwen3-4b-lora": {
+      "full": {
+        "summary": "results/runs/ft-qwen3-4b-lora__test/summary.full.json",
+        "exact_match": {
+          "value": 0.7326832548755884,
+          "ci95": [
+            0.7168796234028245,
+            0.7484868863483524
+          ]
+        },
+        "n_scored": 2974,
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Epoch 2 chosen on the full dev split by the rule fixed in advance (results/serving/dev_select.json): exact match 0.730, epoch 1 0.707. Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+          "subset_hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8"
+        }
+      },
+      "S500": {
+        "summary": "results/runs/ft-qwen3-4b-lora__test/summary.S500.json",
+        "exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.712,
+            0.788
+          ]
+        },
+        "n_scored": 500,
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Epoch 2 chosen on the full dev split by the rule fixed in advance (results/serving/dev_select.json): exact match 0.730, epoch 1 0.707. Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+          "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        }
+      },
+      "S300": {
+        "summary": "results/runs/ft-qwen3-4b-lora__test/summary.S300.json",
+        "exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.7,
+            0.7966666666666666
+          ]
+        },
+        "n_scored": 300,
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Epoch 2 chosen on the full dev split by the rule fixed in advance (results/serving/dev_select.json): exact match 0.730, epoch 1 0.707. Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+          "subset_hash": "fe0a93fdbcf29d45f697e726ef697bb84fd53d99a5d1e7ef8c8ff87627281118"
+        }
+      }
+    }
+  },
+  "throughput": {
+    "status": "ok",
+    "file": "results/serving/T4.json",
+    "operating_point": null,
+    "cost": null
+  },
+  "probes": [
+    {
+      "variant": "base",
+      "model": "Qwen/Qwen3-4B-Instruct-2507",
+      "ok": true,
+      "why": "8 probe answers look sane"
+    },
+    {
+      "variant": "ft",
+      "model": "ft-qwen3-4b-lora",
+      "ok": true,
+      "why": "8 probe answers look sane"
+    }
+  ],
+  "gpu": {
+    "name": "Tesla T4",
+    "memory": "15360 MiB",
+    "compute_capability": "7.5",
+    "driver": "580.178.04"
+  },
+  "snapshot_files": {
+    "configs/data.yaml": "ac827f1277400fda6e24f8c35929b5dce9bb57a2cb7fa255c99da269d0dc4318",
+    "configs/sources.yaml": "21d414389b6f26b8d98e1aa0bab68cf44821c0f0b2b84b24bbe969219f859143",
+    "configs/systems.yaml": "bbd55860381e81749455d3a59e5a3fe11e88f45c8032238924e8ca95e395f6b5",
+    "configs/train.yaml": "5402c183e9adba4fdc02caf70153ccb41fe39c0db19686e564b90e6d65742a0a",
+    "data/processed/dev.jsonl": "aeeb65b11046ca03d7db6427b98d84068f133c45122beb5b91ad8afb36b57d14",
+    "data/processed/sft_dev.jsonl": "1dd2d0e5d6cfa48f21c868448d36c194a703915d17252a60db485f2e788b8996",
+    "data/processed/sft_train.jsonl": "97418d8f03494a2b4422dc4745237cec5d886890ac8f995e32547f76eb24eb9c",
+    "data/processed/test.jsonl": "f5aa55238b946087e9811e687d274d51756c10705bc00b647cf1ac47c184ba82",
+    "data/processed/train.jsonl": "e1bf40a263eaa53cfb5ab44c27bcb23278441cd2cd78b55aec97f8f5bd20a5db",
+    "data/processed/subsets.json": "442b301f76bc8fa93f263305a696ee9a93a7579e90d2a9d2bbc209e5d33163ab",
+    "results/test_lock.jsonl": "b8ab8672cd94cde094e9dba85fdf7b2343001f8dc90e7e6e2e67ed8473bf8f1c"
+  }
+}

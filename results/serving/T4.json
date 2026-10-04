@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-02T12:37:41Z",
+  "gpu": "Tesla T4",
+  "gpu_label": "T4",
+  "gpu_memory_mib": 15360,
+  "gpu_driver": "580.178.04",
+  "system": "ft-qwen3-4b-lora",
+  "model": "ft-qwen3-4b-lora",
+  "engine": "vllm",
+  "engine_version": "0.11.2",
+  "vllm_version": "0.11.2",
+  "dtype": "float16",
+  "base_url": "http://127.0.0.1:8000/v1",
+  "workload": {
+    "prompts_file": "/tmp/serve-eval/throughput_prompts.jsonl",
+    "prompts_sha256": "4bcb5e0c85944730e686f7388d158f0fa80c2850a0f198a5f83e0adcf10cf0e0",
+    "n_prompts": 2974,
+    "requests_per_level": 1000,
+    "max_tokens": 256,
+    "temperature": 0,
+    "seed": 0,
+    "warmup_requests": 8,
+    "mean_prompt_tokens": 34.399,
+    "mean_output_tokens": 20.0
+  },
+  "p95_limit_s": 1.0,
+  "levels": [
+    {
+      "concurrency": 1,
+      "requests": 1000,
+      "ok": 1000,
+      "errors": 0,
+      "error_rate": 0.0,
+      "error_samples": [],
+      "wall_s": 1265.3468734829999,
+      "requests_per_s": 0.7902971279704475,
+      "output_tokens_per_s": 15.805942559408951,
+      "mean_output_tokens": 20.0,
+      "mean_prompt_tokens": 34.399,
+      "finish_reasons": {
+        "stop": 1000
+      },
+      "latency_s": {
+        "p50": 1.263791477000268,
+        "p95": 2.265675778000059,
+        "p99": 2.8346283609998864,
+        "mean": 1.2653416104410062,
+        "max": 4.025313082000139,
+        "n": 1000,
+        "method": "nearest-rank",
+        "note": "seconds from sending a request to its complete answer; failed requests excluded"
+      },
+      "meets_p95_limit": false
+    },
+    {
+      "concurrency": 8,
+      "requests": 1000,
+      "ok": 1000,
+      "errors": 0,
+      "error_rate": 0.0,
+      "error_samples": [],
+      "wall_s": 185.68935905099988,
+      "requests_per_s": 5.385338207373253,
+      "output_tokens_per_s": 107.70676414746505,
+      "mean_output_tokens": 20.0,
+      "mean_prompt_tokens": 34.399,
+      "finish_reasons": {
+        "stop": 1000
+      },
+      "latency_s": {
+        "p50": 1.4740067720003935,
+        "p95": 2.5726369000003615,
+        "p99": 3.2272921099993255,
+        "mean": 1.475739931889988,
+        "max": 4.55826077599977,
+        "n": 1000,
+        "method": "nearest-rank",
+        "note": "seconds from sending a request to its complete answer; failed requests excluded"
+      },
+      "meets_p95_limit": false
+    },
+    {
+      "concurrency": 32,
+      "requests": 1000,
+      "ok": 1000,
+      "errors": 0,
+      "error_rate": 0.0,
+      "error_samples": [],
+      "wall_s": 69.45529713399992,
+      "requests_per_s": 14.397749937930618,
+      "output_tokens_per_s": 287.95499875861236,
+      "mean_output_tokens": 20.0,
+      "mean_prompt_tokens": 34.399,
+      "finish_reasons": {
+        "stop": 1000
+      },
+      "latency_s": {
+        "p50": 2.1623028639996846,
+        "p95": 3.694262458000594,
+        "p99": 4.678861732999394,
+        "mean": 2.1729967699880035,
+        "max": 6.748860993000562,
+        "n": 1000,
+        "method": "nearest-rank",
+        "note": "seconds from sending a request to its complete answer; failed requests excluded"
+      },
+      "meets_p95_limit": false
+    },
+    {
+      "concurrency": 64,
+      "requests": 1000,
+      "ok": 1000,
+      "errors": 0,
+      "error_rate": 0.0,
+      "error_samples": [],
+      "wall_s": 46.26701035400038,
+      "requests_per_s": 21.613672298010005,
+      "output_tokens_per_s": 432.2734459602001,
+      "mean_output_tokens": 20.0,
+      "mean_prompt_tokens": 34.399,
+      "finish_reasons": {
+        "stop": 1000
+      },
+      "latency_s": {
+        "p50": 2.864285048999591,
+        "p95": 4.674049363999984,
+        "p99": 6.125781117999395,
+        "mean": 2.8437947013030054,
+        "max": 8.467263968000225,
+        "n": 1000,
+        "method": "nearest-rank",
+        "note": "seconds from sending a request to its complete answer; failed requests excluded"
+      },
+      "meets_p95_limit": false
+    }
+  ],
+  "operating_point": null,
+  "operating_point_note": "no concurrency level had p95 latency <= 1 s with no failed request",
+  "cost": {
+    "billing_basis": "measured on a free Kaggle GPU; priced as if rented at the list price below, kept fully busy",
+    "formula": "usd_per_hour / (3600 * requests_per_s) * 1000  (finetune_vs_api.cost.selfhost_per_1k)",
+    "assumes": "the GPU is rented for every hour and kept fully busy at the operating point; an idle or half-used GPU costs proportionally more",
+    "price_key": "aws_g4dn_xlarge_ondemand",
+    "rental": {
+      "id": "aws-g4dn.xlarge",
+      "gpu": "1x NVIDIA T4",
+      "url": "https://instances.vantage.sh/aws/ec2/g4dn.xlarge",
+      "retrieved_on": "2026-10-01",
+      "usd_per_hour": {
+        "on_demand": 0.526,
+        "spot": 0.274
+      }
+    },
+    "headline_billing": "on_demand",
+    "at_operating_point": null,
+    "by_concurrency": {
+      "1": {
+        "on_demand": 0.18488123762557165,
+        "spot": 0.09630695648176167
+      },
+      "8": {
+        "on_demand": 0.02713127857245165,
+        "spot": 0.01413302343888166
+      },
+      "32": {
+        "on_demand": 0.010148190636801101,
+        "spot": 0.005286319837421106
+      },
+      "64": {
+        "on_demand": 0.0067601242906122775,
+        "spot": 0.0035214335658322513
+      }
+    }
+  },
+  "extra": {
+    "serving_path": "vllm-lora-triton",
+    "adapter_epoch": "2",
+    "adapter_sha256": "abbaf3638ea2b62a47c16123e805ce0960fd800dd72c2573f30126918a54e143",
+    "base_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "weights": "fp16 base weights, the LoRA adapter applied by vLLM at request time, with Triton attention"
+  }
+}
