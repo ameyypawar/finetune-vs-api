@@ -9,7 +9,7 @@ Every system is compared with `{{ reference }}` on the items both have answered:
 {{ tables.accuracy }}
 
 {% if figures.accuracy %}
-![Exact match against cost per 1,000 calls, with a logarithmic cost axis]({{ figures.accuracy }})
+![Exact match against cost per 1,000 calls, with a logarithmic cost axis: each API as a range from its cached-prefix cost to its no-caching cost, the fine-tune as one marker for each measured load]({{ figures.accuracy }})
 
 {% endif %}
 {% if tables.cost is defined %}
@@ -27,6 +27,10 @@ The fine-tune was measured on the box, with no network in the path, at every loa
 
 {{ tables.by_load }}
 
+{% if figures.latency %}
+![Self-hosted latency at every measured load: p50 and p95 for each number of concurrent requests, with the operating point marked only when a level met the rule]({{ figures.latency }})
+
+{% endif %}
 {% endif %}
 {% if tables.latency is defined %}
 ### Self-hosted latency
@@ -35,10 +39,6 @@ Measured on the box, with no network in the path: p50 and p95 for a single strea
 
 {{ tables.latency }}
 
-{% if figures.latency %}
-![Self-hosted latency: p50 and p95 for a single stream of requests, p95 at the operating point]({{ figures.latency }})
-
-{% endif %}
 {% endif %}
 <details>
 <summary>Other metrics, exact match per scenario, and API latency</summary>

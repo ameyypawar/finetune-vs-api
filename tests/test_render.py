@@ -38,6 +38,7 @@ render = load_script("render")
 START, END = "<!-- results:start -->", "<!-- results:end -->"
 NOTICE = "*All API rows ran on free tiers; no money was spent; costs are at paid list prices."
 FIGURE_FILES = ("accuracy_vs_cost.png", "latency.png")
+REAL_T4 = ROOT / "results" / "serving" / "T4.json"
 
 
 # --- scratch repositories ---------------------------------------------------------------------------------
@@ -775,8 +776,9 @@ def test_the_error_analysis_counts_categories_and_tolerates_blanks(tmp_path):
     assert summary == {"path": "results/error_analysis.csv", "n": 2, "categories": None}  # no category column: only the count
 
 
-def test_figures_are_linked_only_when_they_exist(standard, tmp_path):
-    lab, _ = standard
+@pytest.mark.parametrize("state", ["operating point", "no operating point"])
+def test_figures_are_linked_only_when_they_exist(standard, no_operating_point, tmp_path, state):
+    lab, _ = standard if state == "operating point" else no_operating_point
     with_figures = Repo.with_results(tmp_path / "with", lab)
     with_figures.render()
     assert "](results/figures/accuracy_vs_cost.png)" in with_figures.region() and "](results/figures/latency.png)" in with_figures.region()
@@ -852,9 +854,142 @@ def test_the_latency_table_gives_way_to_the_by_load_table_only_when_there_is_no_
     without.render("readme")
     assert "### Self-hosted latency" not in without.region() and "p95 at the operating point" not in without.region()
     assert "### Self-hosted cost and latency by load" in without.region()
-    assert "results/figures/latency.png" not in without.region()  # that figure shows a single stream and the operating point
+    # the latency figure draws every load, not a single stream and the operating point, so it stays: under the by-load table
+    assert without.region().count("](results/figures/latency.png)") == 1
     assert "it has its own table below, at every measured load" in without.region()
     assert "kept busy at the operating point" in with_point.region() and "own table below" not in with_point.region()
+
+
+@pytest.mark.parametrize("state", ["operating point", "no operating point"])
+def test_the_figure_captions_say_what_the_figures_now_show(standard, no_operating_point, tmp_path, state):
+    """The alt text of the two figures describes the loads they draw, not a single operating point as the headline."""
+    lab, _ = standard if state == "operating point" else no_operating_point
+    repo = Repo.with_results(tmp_path / "repo", lab)
+    repo.render("readme")
+    region = repo.region()
+    captions = {path: alt for alt, path in re.findall(r"!\[(.*?)\]\((.*?)\)", region)}
+    assert set(captions) == {"results/figures/accuracy_vs_cost.png", "results/figures/latency.png"}
+    accuracy, latency = captions["results/figures/accuracy_vs_cost.png"], captions["results/figures/latency.png"]
+    assert "logarithmic cost axis" in accuracy and "each API as a range from its cached-prefix cost to its no-caching cost" in accuracy
+    assert "the fine-tune as one marker for each measured load" in accuracy
+    assert "single stream" not in latency and "operating point" not in accuracy
+    assert "every measured load" in latency and "p50 and p95 for each number of concurrent requests" in latency
+    assert "the operating point marked only when a level met the rule" in latency
+    # the latency figure sits right under the by-load table and its notice, before the next section
+    heading = region.index("### Self-hosted cost and latency by load")
+    figure = region.index("](results/figures/latency.png)")
+    between = region[heading:figure]
+    assert "\n### " not in between and "| Concurrency " in between and NOTICE in between
+    assert region.count("latency.png") == 1
+
+
+def test_the_note_is_shown_once_and_the_older_no_operating_point_warning_is_not_listed_beside_it(no_operating_point, tmp_path):
+    lab, doc = no_operating_point
+    ft = next(s for s in doc["systems"] if s["name"] == FT)
+    assert ft["cost_by_load"]["note"] == NO_OPERATING_POINT_NOTE
+    older = f"results/serving/t4.json, {FT}: no operating point (no concurrency level had p95 latency <= 1 s with no failed request)"
+    assert doc["warnings"] == [older]  # not vacuous: the comparison carries it, and it is the only warning
+    repo = Repo.with_results(tmp_path / "repo", lab)
+    repo.render()
+    for name, text in (("README.md", repo.region()), ("hf/README.md", repo.read("hf/README.md"))):
+        assert text.count(NO_OPERATING_POINT_NOTE) == 1, name
+        assert "no operating point" not in text and "no concurrency level had" not in text, name
+        assert "Warnings from the comparison" not in text, name  # it was the only warning, so the section goes with it
+    assert json.loads(repo.read("results/comparison.json"))["warnings"] == [older]  # only the rendering leaves it out
+
+
+def test_the_declared_form_of_the_warning_is_left_out_too(tmp_path, monkeypatch):
+    """A benchmark file with no operating point and no reason for it gets "no operating point declared"."""
+    monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
+    monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
+    lab = Lab(tmp_path / "lab")
+    lab.write_run(FT)
+    lab.write_serving(doc={k: v for k, v in NO_OPERATING_POINT_SERVING.items() if k not in ("operating_point", "operating_point_note")})
+    lab.write_audit()
+    lab.write_subsets()
+    doc = comparison_for(lab)
+    assert doc["warnings"] == [f"results/serving/t4.json, {FT}: no operating point declared"]
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    for text in (repo.region(), repo.read("hf/README.md")):
+        assert "no operating point" not in text and NO_OPERATING_POINT_NOTE in text  # the levels all miss the limit, so the note says so
+
+
+def test_other_warnings_are_listed_as_before_beside_the_note(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
+    monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
+    lab = Lab(tmp_path / "lab")
+    lab.write_run(FT)
+    lab.write_run(GPT_OSS_20B, models=lambda position: "model-a" if position <= 100 else "model-b")
+    lab.write_serving(doc=NO_OPERATING_POINT_SERVING)
+    lab.write_audit()
+    lab.write_subsets()
+    doc = comparison_for(lab)
+    other = next(w for w in doc["warnings"] if "model name" in w)
+    older = next(w for w in doc["warnings"] if "no operating point" in w)
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    for text in (repo.region(), repo.read("hf/README.md")):
+        assert "Warnings from the comparison" in text and f"- {other}" in text
+        assert older not in text and text.count(NO_OPERATING_POINT_NOTE) == 1
+
+
+def test_a_warning_about_an_operating_point_that_is_not_a_measured_load_is_still_listed(tmp_path, monkeypatch):
+    """The note says no operating point was chosen; this warning says the file named one that cannot be used."""
+    monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
+    monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
+    lab = Lab(tmp_path / "lab")
+    lab.write_run(FT)
+    lab.write_serving(doc={**NO_OPERATING_POINT_SERVING, "operating_point": {"concurrency": 99}})
+    lab.write_audit()
+    lab.write_subsets()
+    doc = comparison_for(lab)
+    warning = next(w for w in doc["warnings"] if "is not one of the measured concurrency levels" in w)
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    for text in (repo.region(), repo.read("hf/README.md")):
+        assert f"- {warning}" in text and NO_OPERATING_POINT_NOTE in text
+
+
+def test_shown_warnings_drops_only_the_fine_tunes_own_no_operating_point_warning():
+    path = "results/serving/T4.json"
+    ours = [f"{path}, {FT}: no operating point (no level qualified)", f"{path}, {FT}: no operating point declared"]
+    others = [
+        f"{path}, {FT}: the operating point (99) is not one of the measured concurrency levels [1, 8]",
+        f"{path}, {FT}: concurrency 8 lacks latency_s.p50, latency_s.p95 or requests_per_s (seconds)",
+        f"{path}, {BASE}: no operating point declared",  # another row's: its note is not shown, so neither is it dropped
+        f"results/serving/other.json, {FT}: no operating point declared",  # another file's
+        f"{FT}: only 100 of the 500 S500 items have an answer",
+    ]
+    block = {"operating_point": None, "note": "a note", "levels": [{"concurrency": 1}]}
+    doc = {
+        "reference": FT, "warnings": [*ours, *others], "self_hosted": {"benchmark": {"path": path}},
+        "systems": [{"name": FT, "cost_by_load": block}, {"name": BASE, "cost_by_load": None}],
+    }
+    assert render.shown_warnings(doc) == others
+    assert doc["warnings"] == [*ours, *others]  # the comparison's own list is not changed
+    doc["systems"][0]["cost_by_load"] = {**block, "operating_point": 1, "note": None}  # a level met the rule: no note
+    assert render.shown_warnings(doc) == [*ours, *others]
+    doc["systems"][0]["cost_by_load"] = None  # no benchmark levels at all
+    assert render.shown_warnings(doc) == [*ours, *others]
+
+
+@pytest.mark.skipif(not REAL_T4.exists(), reason="results/serving/T4.json is not in this checkout")
+def test_the_real_t4_benchmark_shows_its_note_once_and_without_its_older_warning(tmp_path, monkeypatch):
+    raw = json.loads(REAL_T4.read_text(encoding="utf-8"))
+    monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
+    monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
+    lab = Lab(tmp_path / "lab").populate()
+    (lab.results / "serving" / "t4.json").unlink()  # the stand-in benchmark; the real file takes its place
+    lab.write_serving(name="T4", doc=raw)
+    doc = comparison_for(lab)
+    older = f"results/serving/T4.json, {FT}: no operating point ({raw['operating_point_note']})"
+    assert older in doc["warnings"]
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    for text in (repo.region(), repo.read("hf/README.md")):
+        assert text.count(NO_OPERATING_POINT_NOTE) == 1
+        assert older not in text and raw["operating_point_note"] not in text
 
 
 def test_the_cost_table_keeps_its_self_hosted_row_when_a_level_met_the_rule(standard, tmp_path):

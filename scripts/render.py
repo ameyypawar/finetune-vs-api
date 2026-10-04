@@ -18,8 +18,11 @@ because the tables are only ever built by `md_table` here, which adds it.
 The fine-tune's cost and latency at every measured load level (`cost_by_load` in the comparison) are one
 table, `by_load_table`: in full in the README and the card, and with fewer columns in the write-up, which
 has a length limit. No level is the headline: an operating point is marked only when a level met the rule,
-and without one the table replaces the README's self-hosted latency table and says why. The write-up's
-other compact tables drop a column only when every row reads the same (Items, Priced as).
+and without one the table replaces the README's self-hosted latency table and says why. The README shows
+the latency figure under that table, since the figure draws every level too. The note that says why there
+is no operating point is shown once: the benchmark's own warning to the same effect is not listed again
+(`shown_warnings`), though it stays in the comparison. The write-up's other compact tables drop a column
+only when every row reads the same (Items, Priced as).
 
 With no results (no results/comparison.json, or one in which no system has been scored) the README
 region is empty, so README.md stays exactly as it is committed. The card and the write-up are then
@@ -335,6 +338,25 @@ def by_load_table(doc: Mapping[str, Any], *, compact: bool = False) -> str | Non
     if apis:
         headers.append("APIs whose break-even range one GPU can serve")
     return md_table(doc, headers, rows, "r" * 7 + ("l" if apis else ""))
+
+
+def shown_warnings(doc: Mapping[str, Any]) -> list[str]:
+    """The comparison's warnings as the README and the card list them.
+
+    When the fine-tune's `cost_by_load` carries a note, the by-load section already says why there is no operating
+    point, so the benchmark's own warning to that effect ("no operating point (...)", or "no operating point
+    declared" when the file gave no reason) is left out: the note is shown once, and not the warning as well. The
+    warning stays in results/comparison.json. Every other warning, including one about an operating point the
+    benchmark named but that is not a measured level, is shown as before. Only the fine-tune's warning is dropped,
+    because its note is the one the documents show.
+    """
+    warnings = list(doc["warnings"])
+    block = by_load_block(doc)
+    if not block or not block["note"]:
+        return warnings
+    path = ((doc.get("self_hosted") or {}).get("benchmark") or {}).get("path")
+    prefix = f"{path}, {doc['reference']}: no operating point"
+    return [w for w in warnings if not (w == f"{prefix} declared" or w.startswith(f"{prefix} ("))]
 
 
 def api_latency_table(doc: Mapping[str, Any]) -> str | None:
@@ -703,7 +725,7 @@ def comparison_context(doc: Mapping[str, Any], dataset: Mapping[str, Any] | None
         "finding_summary": finding_summary(doc),
         "subset_notes": subset_notes(doc),
         "gap_lines": gap_lines(doc),
-        "warnings": list(doc["warnings"]),
+        "warnings": shown_warnings(doc),
         "ft_facts": ft_facts,
         "pair_half_width_max": f"{max(pair_widths) * 100:.1f} pp" if pair_widths else None,
         "gpu": gpu and {

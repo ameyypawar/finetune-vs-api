@@ -238,8 +238,11 @@ locking again.
   writes a file saying so. The self-hosted row carries the table of cost and latency by load (`cost_by_load`), and
   each API's break-even entry says, for every level, whether one GPU serves its volume.
 - `scripts/make_figures.py` writes `results/figures/accuracy_vs_cost.png` (exact match against cost per 1,000
-  calls on a logarithmic axis) and `results/figures/latency.png` (self-hosted latency only). It draws to files
-  with matplotlib's Agg backend, so it needs no display.
+  calls on a logarithmic axis: each API as a range, the fine-tune as one marker at the cost of each load level the
+  benchmark measured, joined by a line and labelled with its concurrency, with the operating point labelled only
+  when a level met the rule) and `results/figures/latency.png` (the fine-tune's p50 and p95 at every load level,
+  on the box, with the operating point marked only when there is one; API latency is not drawn). It draws to
+  files with matplotlib's Agg backend, so it needs no display.
 - `scripts/render.py --target readme|card|writeup|all` fills the region of `README.md` between its
   `results:start` and `results:end` markers, writes `hf/README.md` and `docs/writeup.md`, and with `--check`
   exits 1 if any of them is out of date. CI runs the check. With no results the README is left byte-for-byte
