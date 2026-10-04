@@ -31,7 +31,7 @@ This is the slot for the hand-labelled error analysis: the errors go in `results
 
 ## Cost and break-even
 
-API costs are computed from tokens at the providers' paid list prices, as a no-caching bound and a bound with the static prompt prefix cached. Self-hosted cost comes from throughput measured on Kaggle's free T4, priced at the on-demand rate for renting the same GPU on AWS (g4dn.xlarge). The break-even is the monthly volume at which a GPU rented around the clock (730 hours at the on-demand price) costs less than each API, given that one GPU can serve that volume. The self-hosted figure is the price with the GPU kept fully busy; an idle or half-used GPU costs proportionally more. Self-hosted latency is measured on the box: p50 and p95 for a single stream of requests, and p95 at the operating point. API latency goes to the appendix.
+API costs are computed from tokens at the providers' paid list prices, as a no-caching bound and a bound with the static prompt prefix cached. Self-hosted cost comes from throughput measured on Kaggle's free T4 at every concurrency level of the sweep, priced at the on-demand and spot rates for renting the same GPU on AWS (g4dn.xlarge), and is reported at each level with its latency. The break-even is the monthly volume at which a GPU rented around the clock (730 hours at the on-demand price) costs less than each API, given that one GPU can serve that volume at that level. The self-hosted figures are the price with the GPU kept busy at that level; an idle or half-used GPU costs proportionally more. Self-hosted latency is measured on the box; API latency goes to the appendix.
 
 ## Why now
 

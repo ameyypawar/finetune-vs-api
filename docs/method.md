@@ -42,6 +42,13 @@ total equalled prompt plus completion and took about as long as with more thinki
   the same dev scores (exact match 0.729 and 0.730 for epoch 2; 0.707 and 0.707 for epoch 1; 0.667 and 0.666 for
   the base row): `results/serving/dev_select.json` is the second run, `dev_select_v1_hf_transformers.json` the
   first. Test runs of the self-hosted rows use the second run's serving path.
+- **2026-10-04, cost by load.** The operating-point rule found no level on a T4. The rule priced self-hosted cost at
+  one operating point, the highest concurrency whose p95 latency is at most 1 s with no failed request. The throughput
+  sweep of the fine-tuned row on a Kaggle T4 (vLLM with Triton attention, 1,000 requests at each of 1, 8, 32 and 64
+  concurrent requests) has no such level: p95 is about 2.3 s even with one request at a time, and 4.7 s at 64. Self-hosted
+  cost is therefore reported at every concurrency level fixed in advance (1, 8, 32 and 64), as a table of requests per
+  second, p50, p95 and cost per 1,000 calls, instead of at a single operating point, and no level is the headline.
+  Nothing else in the method changed, and the API comparison is unaffected.
 
 ## Metrics
 
@@ -142,28 +149,38 @@ apply, the cost is a pair of bounds, per 1,000 calls (`src/finetune_vs_api/cost.
 A price entry with no cached input price (qwen3.8-27b on Groq lists none) gets no caching discount, so
 its two bounds are equal.
 
-**Self-hosted rows** are priced as a rented GPU: the on-demand hourly price of the `aws-g4dn.xlarge` entry (one
-T4), divided by the requests per second the throughput benchmark measured at the operating point. It is the
-cost with the GPU kept busy; an idle or half-used GPU costs proportionally more.
+**Self-hosted rows** are priced as a rented GPU kept busy: the hourly price of the `aws-g4dn.xlarge` entry (one T4),
+divided by the requests per second the throughput benchmark measured. The cost per 1,000 calls is reported at every
+concurrency level the benchmark fixed in advance (1, 8, 32 and 64), at the on-demand price and at the spot price, in a
+table with the level's requests per second, p50 and p95 and what one GPU serves a month at that rate (requests per
+second times 3,600 times 730). No level is the headline: more concurrency gave more requests per second and a higher
+latency, and the table shows both. An idle or half-used GPU costs proportionally more.
 
-**Break-even** is the monthly API volume at which the API bill equals the cost of keeping that GPU for
-every hour of the month: the hourly price times 730 hours, divided by the API's cost per call, at each bound.
-Above that volume the rental is cheaper, provided one GPU can serve it. `scripts/compare.py` therefore also
-records what one GPU serves a month at the operating point (requests per second times 3,600 times 730) and
-whether each break-even volume fits within it; where it does not, the GPU never gets cheaper on this
-request mix.
+The rule fixed in advance priced a single operating point instead: the highest concurrency whose p95 is at most 1 s
+with no failed request. `scripts/compare.py` still prices it, and the table marks it, when a level meets that rule. On
+the T4 none does (see "Changes to the plan"): the table says so, and no cost is attached to any one level.
+
+**Break-even** is the monthly API volume at which the API bill equals the cost of keeping that GPU for every hour of
+the month: the on-demand hourly price times 730 hours, divided by the API's cost per call, at each bound. It does not
+depend on the load level. Above that volume the rental is cheaper, provided one GPU can serve it, and that does depend
+on the level: `scripts/compare.py` records, for every concurrency level, whether each break-even volume fits within what
+one GPU serves a month there (and the same at the operating point, when there is one). Where a volume does not fit, one
+GPU at that load costs more than the API for every volume it can serve, on this request mix.
 
 What this leaves out: the throughput is measured on a Kaggle T4 and assumed to carry over to the rented
-T4 (the same GPU class, not measured on AWS); spot prices; engineering time, storage and network; bursty or
-low traffic; more than one GPU. The API prompts are long (retrieved examples) and the fine-tune's is a
-single line, which is part of what is being compared, not an artefact.
+T4 (the same GPU class, not measured on AWS); spot instances beyond the spot cost in the table (the break-even and the
+capacity use the on-demand price, and a spot instance can be reclaimed, which none of these figures allows for);
+engineering time, storage and network; bursty or low traffic; more than one GPU. The API prompts are long (retrieved
+examples) and the fine-tune's is a single line, which is part of what is being compared, not an artefact.
 
 ## Latency
 
 - **Headline: the self-hosted rows, on the box.** `scripts/bench_throughput.py` runs next to the server, so
-  no network is in the path, and writes `results/serving/<gpu>.json`. The headline numbers are p50 and p95 at
-  concurrency 1 and p95 at the operating point, which is the highest concurrency whose p95 stays under the
-  benchmark's limit with no failed request. Percentiles use the nearest-rank rule.
+  no network is in the path, and writes `results/serving/<gpu>.json`. The headline is a table of p50 and p95 at
+  every concurrency level fixed in advance (1, 8, 32 and 64), next to the cost at that level. The operating
+  point, which is the highest concurrency whose p95 stays within the benchmark's limit (1 s) with no failed
+  request, is marked in the table when a level meets it; on the T4 none does. Percentiles use the nearest-rank
+  rule.
 - **Appendix: the API rows, as observed.** The runner records each call's latency for the successful attempt,
   excluding waits for a rate limit and retry backoff. These are *observed on free tiers from India; not
   representative of paid tiers*, and they are only ever shown with that label. They are not compared with the
@@ -171,7 +188,9 @@ single line, which is part of what is being compared, not an artefact.
 
 `scripts/compare.py` reads, for the GPU named in the rental entry, a file with `gpu`, `system`, `levels` (each
 with `concurrency`, `requests_per_s` and `latency_s.p50` and `.p95`, in seconds) and `operating_point`. A file
-that does not fit is reported in `warnings`, never guessed at.
+that does not fit is reported in `warnings`, never guessed at. A level with no usable throughput keeps its latency
+and is shown without a cost. When `operating_point` is null, the self-hosted row's `cost_by_load` in
+`results/comparison.json` says so in a note, and still prices every measured level.
 
 ## The test lock
 
@@ -216,7 +235,8 @@ locking again.
 - `scripts/compare.py` reads the test predictions and summaries under `results/runs/`, the gold labels in
   `data/processed/`, `results/data_audit.json`, the benchmark file and `configs/`, and writes
   `results/comparison.json`. Missing inputs are reported under `warnings`, never guessed; with no results it
-  writes a file saying so.
+  writes a file saying so. The self-hosted row carries the table of cost and latency by load (`cost_by_load`), and
+  each API's break-even entry says, for every level, whether one GPU serves its volume.
 - `scripts/make_figures.py` writes `results/figures/accuracy_vs_cost.png` (exact match against cost per 1,000
   calls on a logarithmic axis) and `results/figures/latency.png` (self-hosted latency only). It draws to files
   with matplotlib's Agg backend, so it needs no display.
@@ -224,6 +244,8 @@ locking again.
   `results:start` and `results:end` markers, writes `hf/README.md` and `docs/writeup.md`, and with `--check`
   exits 1 if any of them is out of date. CI runs the check. With no results the README is left byte-for-byte
   as committed.
+  The README, the card and the write-up each show the table of self-hosted cost and latency by load when a
+  benchmark was read (the write-up's has fewer columns, to stay short).
   Every number comes from a file and none is typed into a template. Every table is followed by the same
   notice, with the source URLs and the dates they were read on: all API rows ran on free tiers, no money was
   spent, and costs are at paid list prices.

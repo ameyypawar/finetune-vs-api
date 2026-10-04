@@ -159,6 +159,14 @@ Each system is scored on a fixed, seeded test subset stratified by scenario: {{ 
 {% if ft_facts %}
 The fine-tune's exact match has a {{ bootstrap.confidence | pct(0) }} interval of plus or minus {{ ft_facts.em_half_width }} on {{ ft_facts.subset }}{% if ft_facts.full_half_width %} and {{ ft_facts.full_half_width }} on the full split{% endif %}.
 {% endif %}
+{% if tables.by_load is defined %}
+
+### Serving cost and latency
+
+Measured on the box, with no network in the path, at every load level fixed in advance. {% if by_load.note %}{{ by_load.note }}{% else %}The operating point, the highest concurrency whose p95 stays within the limit, is marked.{% endif %} Each cost is a GPU rented at that price and kept busy at that load, at the on-demand price and at the spot price; the calls one GPU serves a month are its throughput at that load over {{ hours_per_month }} hours.
+
+{{ tables.by_load }}
+{% endif %}
 {% if warnings %}
 
 Warnings from the comparison:

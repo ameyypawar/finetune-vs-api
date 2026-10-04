@@ -22,12 +22,17 @@ What it computes (definitions in docs/method.md):
                exact match on the test items whose text never occurs in train; exact match per
                scenario.
     cost       API rows: cost per 1,000 calls at paid list price, as a no-caching bound and a
-               cached-prefix bound. Self-hosted rows: cost per 1,000 calls at full utilization.
-               The monthly volume at which a GPU rented 24/7 (730 h, on-demand price) becomes
-               cheaper than each API.
+               cached-prefix bound. Self-hosted rows: cost per 1,000 calls with the GPU kept busy,
+               at every concurrency level the benchmark measured (`cost_by_load`: requests per
+               second, p50, p95, cost at the on-demand and the spot price, and the calls one GPU
+               serves a month), with no level picked as the headline. The operating point (the
+               highest concurrency with p95 <= 1 s) is still priced when a level meets that rule,
+               and `cost_by_load` says so when none does. The monthly volume at which a GPU rented
+               24/7 (730 h, on-demand price) becomes cheaper than each API; it does not depend on
+               the load, and for each level the document records whether one GPU can serve it.
     latency    headline: the self-hosted rows measured on the box (the throughput benchmark): p50
-               and p95 at concurrency 1, and at the operating point. Appendix: the API rows, as
-               observed on free tiers.
+               and p95 at every concurrency level, and at the operating point when there is one.
+               Appendix: the API rows, as observed on free tiers.
     warnings   partial runs, a model name that changed during a run, runs outside the test lock,
                estimated token counts, an interval and a McNemar test that disagree, ...
 
@@ -68,15 +73,25 @@ SCHEMA_VERSION = 1
 REFERENCE = "ft-qwen3-4b-lora"
 HEADLINE_SUBSET = "S500"  # where a row that ran on the full split is compared with the API rows
 GPU_RENTAL_ID = "aws-g4dn.xlarge"  # the entry in configs/sources.yaml used for self-hosted cost
-PRICE_BASIS = "on_demand"
+PRICE_BASIS = "on_demand"  # break-even and capacity use this price
+SPOT_BASIS = "spot"  # shown next to it for each load level, never used for break-even
+P95_LIMIT_S = 1.0  # the pre-registered operating-point rule (docs/method.md); scripts/bench_throughput.py's default
 CONFIDENCE = 0.95
 EXIT_ERROR = 2
 
 #: Printed with every API latency number: in the JSON, on the figures and in the generated docs.
 API_LATENCY_LABEL = "observed on free tiers from India; not representative of paid tiers"
 LATENCY_POLICY = (
-    "Headline latency is the self-hosted rows measured on the box (p50 and p95 at concurrency 1, "
-    "p95 at the operating point). API latency is an appendix."
+    "Headline latency is the self-hosted rows measured on the box (p50 and p95 at every concurrency level, "
+    "p95 at the operating point when there is one). API latency is an appendix."
+)
+#: Why `cost_by_load.operating_point` is null. The first is what a null operating point means when the levels agree;
+#: the second is used when some level did have p95 <= P95_LIMIT_S, so nothing is claimed about the rule.
+NO_OPERATING_POINT_NOTE = (
+    f"No level met the p95 <= {P95_LIMIT_S:g} s rule, so cost is reported at every measured level instead."
+)
+UNDECLARED_OPERATING_POINT_NOTE = (
+    "The benchmark file names no usable operating point, so cost is reported at every measured level instead."
 )
 EXACT_MATCH_DIFFERENCE = "system minus reference"
 SECONDS_PER_MONTH = 3600 * cost.HOURS_PER_MONTH
@@ -572,20 +587,88 @@ def self_hosted_cost(rental: Mapping[str, Any] | None, bench: Mapping[str, Any] 
     }
 
 
-def api_break_even(per_1k: Mapping[str, float], rental: Mapping[str, Any], capacity: float | None) -> dict[str, Any]:
+def rental_prices(sources: Mapping[str, Any]) -> dict[str, float | None]:
+    """USD per hour of the rented GPU at the on-demand and at the spot price; None for one the entry lacks."""
+    hourly = ((sources.get("gpu_rental") or {}).get(GPU_RENTAL_ID) or {}).get("usd_per_hour") or {}
+    return {basis: _number(hourly.get(basis)) for basis in (PRICE_BASIS, SPOT_BASIS)}
+
+
+def no_operating_point_note(levels: Sequence[Mapping[str, Any]]) -> str:
+    """Why there is no operating point, claiming no more than the levels show.
+
+    "No level met the rule" is only said when every level with a p95 is above the limit. When some level is within
+    it, the benchmark file simply did not name an operating point (or named one that cannot be used).
+    """
+    within = [level for level in levels if level["p95_s"] is not None and level["p95_s"] <= P95_LIMIT_S]
+    return UNDECLARED_OPERATING_POINT_NOTE if within else NO_OPERATING_POINT_NOTE
+
+
+def cost_by_load(
+    rental: Mapping[str, Any] | None, prices: Mapping[str, float | None], bench: Mapping[str, Any] | None
+) -> dict[str, Any] | None:
+    """Cost and latency at every measured concurrency level; no level is picked as the headline.
+
+    Each level is priced with `cost.selfhost_per_1k` at the on-demand and at the spot price, with the GPU kept busy
+    at that level's throughput. `capacity_calls_per_month` is what one GPU serves a month at that rate. A level whose
+    throughput is missing or zero keeps its latency and gets no cost and no capacity, never a guessed one.
+    `operating_point` is the concurrency the pre-registered rule chose, or None, in which case `note` says why.
+    """
+    levels = (bench or {}).get("levels")
+    if rental is None or not levels:
+        return None
+    operating = ((bench or {}).get("operating_point") or {}).get("concurrency")
+    rows = []
+    for level in levels:
+        rate = level["requests_per_s"]
+        rows.append(
+            {
+                "concurrency": level["concurrency"],
+                "requests_per_s": rate,
+                "p50_s": level["p50_s"],
+                "p95_s": level["p95_s"],
+                "per_1k_calls_usd": {
+                    basis: cost.selfhost_per_1k(price, rate) if rate and price is not None else None
+                    for basis, price in prices.items()
+                },
+                "capacity_calls_per_month": rate * SECONDS_PER_MONTH if rate else None,
+            }
+        )
+    return {
+        "basis": f"{rental['id']} rented at the on-demand and at the spot price, kept busy at each measured concurrency level",
+        "usd_per_hour": dict(prices),
+        "operating_point": operating,
+        "note": None if operating is not None else no_operating_point_note(levels),
+        "levels": rows,
+    }
+
+
+def api_break_even(
+    per_1k: Mapping[str, float],
+    rental: Mapping[str, Any],
+    capacity: float | None,
+    capacity_by_level: Mapping[int, float | None] | None = None,
+) -> dict[str, Any]:
     """Monthly calls at which the API bill equals the rental, at each cost bound.
 
-    Above that volume the GPU is cheaper, provided one GPU can serve it (`within_capacity`).
+    Above that volume the GPU is cheaper, provided one GPU can serve it. `within_capacity` says whether it can at the
+    operating point; `within_capacity_by_concurrency` says it for every measured level (`capacity_by_level` maps a
+    concurrency to the calls one GPU serves a month there). The volume itself is the price of the GPU for every hour
+    of the month over the API's cost per call, so it does not depend on the load.
     `no_caching` uses the upper cost bound, so it is the smaller volume.
     """
     volumes: dict[str, float | None] = {}
     for label, bound in (("no_caching", "upper"), ("cached_prefix", "lower")):
         volume = cost.breakeven_calls_per_month(rental["usd_per_hour"], per_1k[bound] / 1000)
         volumes[label] = None if math.isinf(volume) else volume
+
+    def within(limit: float | None) -> dict[str, bool | None]:
+        return {k: None if v is None or limit is None else v <= limit for k, v in volumes.items()}
+
     return {
         "calls_per_month": volumes,
         "requests_per_s": {k: None if v is None else v / SECONDS_PER_MONTH for k, v in volumes.items()},
-        "within_capacity": {k: None if v is None or capacity is None else v <= capacity for k, v in volumes.items()},
+        "within_capacity": within(capacity),
+        "within_capacity_by_concurrency": {str(c): within(limit) for c, limit in (capacity_by_level or {}).items()},
     }
 
 
@@ -625,6 +708,7 @@ def system_record(
         "full_test": None,
         "model_names": None,
         "cost": None,
+        "cost_by_load": None,
         "latency_observed": None,
         "run": None,
     }
@@ -721,6 +805,7 @@ def build_comparison(
     by_name = {r["name"]: r for r in records}
 
     rental = rental_entry(sources, warnings)
+    prices = rental_prices(sources)
     bench = load_benchmark(results_dir, (rental or {}).get("gpu"), reference, root, warnings) if rental else None
     if bench is None and rental is not None and any(r["metrics"] for r in records) and not (results_dir / "serving").is_dir():
         warnings.append("no throughput benchmark under results/serving; no self-hosted cost, latency or capacity")
@@ -732,6 +817,7 @@ def build_comparison(
         entry = bench_systems.get(name)
         priced = self_hosted_cost(rental, entry)
         record["cost"] = priced
+        record["cost_by_load"] = cost_by_load(rental, prices, entry)
         self_hosted_systems[name] = {
             "levels": (entry or {}).get("levels"),
             "single_stream": (entry or {}).get("single_stream"),
@@ -739,10 +825,15 @@ def build_comparison(
             "cost": priced,
         }
     capacity = ((by_name[reference]["cost"] or {}).get("capacity_calls_per_month")) if reference in self_hosted_systems else None
+    by_load = by_name[reference]["cost_by_load"] or {}
+    capacity_by_level = {level["concurrency"]: level["capacity_calls_per_month"] for level in by_load.get("levels", [])}
     break_even = None
     if rental is not None:
         apis = {
-            name: {"per_1k_calls_usd": r["cost"]["per_1k_calls_usd"], **api_break_even(r["cost"]["per_1k_calls_usd"], rental, capacity)}
+            name: {
+                "per_1k_calls_usd": r["cost"]["per_1k_calls_usd"],
+                **api_break_even(r["cost"]["per_1k_calls_usd"], rental, capacity, capacity_by_level),
+            }
             for name, r in by_name.items()
             if r["kind"] == "api" and r["cost"]
         }
@@ -837,6 +928,11 @@ def report(doc: Mapping[str, Any], path: Path, out: Callable[[str], None]) -> No
                 low, high = pair["difference"]["ci95"]
                 line += f"  vs {doc['reference']} {pair['difference']['value'] * 100:+.1f} pp [{low * 100:+.1f}, {high * 100:+.1f}]: {pair['verdict']['text']}"
         out(line)
+    for system in doc["systems"]:
+        by_load = system.get("cost_by_load")
+        if by_load:
+            where = by_load["note"] or f"operating point at concurrency {by_load['operating_point']}"
+            out(f"  {system['name']:24s} cost by load, {len(by_load['levels'])} levels: {where}")
     for message in doc["warnings"]:
         out(f"  warning: {message}")
 

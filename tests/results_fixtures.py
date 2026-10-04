@@ -43,10 +43,44 @@ ROUND_PRICES = {
     "google-gemini-3.5-flash-lite": {"input": 1.0, "cached_input": 0.5, "output": 4.0},
 }
 GPU_ON_DEMAND = 0.5  # USD per hour
+GPU_SPOT = 0.25  # USD per hour
 USAGE = (1000, 100)  # prompt tokens, completion tokens per call
 PREFIX_TOKENS = 800
 STUB_MODEL = "stub-model-2026-09-01"
 LOCK = {"locked_at": "2026-10-02T09:00:00Z", "reason": "frozen for the test run"}
+
+#: A throughput benchmark in which no level meets the p95 <= 1 s rule, shaped like the real T4 run
+#: (results/serving/T4.json): four load levels fixed in advance, every p95 above 1 s, so no operating point. The
+#: throughputs are round numbers, so the costs can be worked out by hand: a GPU at $0.50 an hour kept busy at
+#: 1 request/s costs 0.5 / 3600 * 1000 USD per 1,000 calls (spot: $0.25 an hour), and serves 3,600 * 730 = 2,628,000
+#: calls a month.
+NO_OPERATING_POINT_SERVING = {
+    "gpu": "Tesla T4",
+    "system": FT,
+    "p95_limit_s": 1.0,
+    "levels": [
+        {"concurrency": 1, "requests_per_s": 1.0, "latency_s": {"p50": 1.26, "p95": 2.27}},
+        {"concurrency": 8, "requests_per_s": 5.0, "latency_s": {"p50": 1.47, "p95": 2.57}},
+        {"concurrency": 32, "requests_per_s": 15.0, "latency_s": {"p50": 2.16, "p95": 3.69}},
+        {"concurrency": 64, "requests_per_s": 20.0, "latency_s": {"p50": 2.86, "p95": 4.67}},
+    ],
+    "operating_point": None,
+    "operating_point_note": "no concurrency level had p95 latency <= 1 s with no failed request",
+}
+
+#: A benchmark whose levels straddle the API break-even volumes of the round prices above (a month of the $0.50 GPU
+#: is $365). The levels serve 131,400 / 262,800 / 525,600 / 788,400 / 1,051,200 calls a month; the break-even
+#: volumes (no caching, cached prefix) are gpt-oss-20b 304,167 / 608,333, gpt-oss-120b 608,333 / 912,500,
+#: qwen3.8-27b 152,083 / 152,083 and gemini 260,714 / 365,000. So some levels serve one bound of an API and not the
+#: other, which is the case worth testing. Every p95 is above 1 s, so there is no operating point.
+BREAK_EVEN_SERVING = {
+    "gpu": "Tesla T4",
+    "system": FT,
+    "levels": [
+        {"concurrency": concurrency, "requests_per_s": rate, "latency_s": {"p50": 1.5, "p95": 2.5}}
+        for concurrency, rate in ((1, 0.05), (2, 0.1), (4, 0.2), (8, 0.3), (16, 0.4))
+    ],
+}
 
 
 def wrong_answer(example: data.Example) -> str:
@@ -74,6 +108,7 @@ class Lab:
         for key, usd in ROUND_PRICES.items():
             sources["prices"][key]["usd_per_mtok"] = dict(usd)
         sources["gpu_rental"]["aws-g4dn.xlarge"]["usd_per_hour"]["on_demand"] = GPU_ON_DEMAND
+        sources["gpu_rental"]["aws-g4dn.xlarge"]["usd_per_hour"]["spot"] = GPU_SPOT
         (self.config_dir / "sources.yaml").write_text(
             yaml.safe_dump(sources, sort_keys=False, allow_unicode=True), encoding="utf-8"
         )

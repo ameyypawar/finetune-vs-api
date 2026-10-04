@@ -15,6 +15,12 @@ types a number. The output has no date or time in it, so rendering twice gives t
 Every table is followed by the same notice, with the source URLs and the dates they were read on,
 because the tables are only ever built by `md_table` here, which adds it.
 
+The fine-tune's cost and latency at every measured load level (`cost_by_load` in the comparison) are one
+table, `by_load_table`: in full in the README and the card, and with fewer columns in the write-up, which
+has a length limit. No level is the headline: an operating point is marked only when a level met the rule,
+and without one the table replaces the README's self-hosted latency table and says why. The write-up's
+other compact tables drop a column only when every row reads the same (Items, Priced as).
+
 With no results (no results/comparison.json, or one in which no system has been scored) the README
 region is empty, so README.md stays exactly as it is committed. The card and the write-up are then
 drafts that say the results are pending.
@@ -145,6 +151,10 @@ def seconds(value: float) -> str:
     return f"{value:.2f} s"
 
 
+def per_second(value: float) -> str:
+    return f"{value:.2f}"
+
+
 def p_value(value: float) -> str:
     return "<0.001" if value < 0.001 else f"{value:.3f}"
 
@@ -189,7 +199,8 @@ def _code(name: str) -> str:
 
 
 def accuracy_table(doc: Mapping[str, Any], *, compact: bool = False) -> str:
-    """Exact match per system, paired against the reference. `compact` drops the McNemar and full-split columns."""
+    """Exact match per system, paired against the reference. `compact` drops the McNemar and full-split columns,
+    and the Items column when it reads the same on every row (the write-up's setup paragraph names the subsets)."""
     rows = []
     reference = doc["reference"]
     for s in doc["systems"]:
@@ -220,12 +231,16 @@ def accuracy_table(doc: Mapping[str, Any], *, compact: bool = False) -> str:
     align = "llrrrlr"
     if compact:
         keep = [0, 1, 2, 3, 5]
+        if len({row[1] for row in rows}) == 1:
+            keep.remove(1)
         headers, align = [headers[i] for i in keep], "".join(align[i] for i in keep)
         rows = [[row[i] for i in keep] for row in rows]
     return md_table(doc, headers, rows, align)
 
 
-def cost_table(doc: Mapping[str, Any]) -> str | None:
+def cost_table(doc: Mapping[str, Any], *, compact: bool = False) -> str | None:
+    """Cost and break-even per system. `compact` (the write-up) drops "Priced as" when every row is an API row:
+    the column would say "paid list price" on each line, which the notice under the table already says."""
     rows = []
     be = (doc.get("break_even") or {}).get("apis", {})
     for s in doc["systems"]:
@@ -244,7 +259,12 @@ def cost_table(doc: Mapping[str, Any]) -> str | None:
     if not rows:
         return None
     headers = ["System", "Priced as", "Cost per 1,000 calls (cached prefix to no caching)", "Break-even calls per month (same order)"]
-    return md_table(doc, headers, rows, "llrr")
+    align = "llrr"
+    if compact and all(s["kind"] == "api" for s in doc["systems"] if s["cost"]):
+        keep = [0, 2, 3]
+        headers, align = [headers[i] for i in keep], "".join(align[i] for i in keep)
+        rows = [[row[i] for i in keep] for row in rows]
+    return md_table(doc, headers, rows, align)
 
 
 def latency_table(doc: Mapping[str, Any]) -> str | None:
@@ -264,6 +284,57 @@ def latency_table(doc: Mapping[str, Any]) -> str | None:
         return None
     headers = ["System", "p50, concurrency 1", "p95, concurrency 1", "p95 at the operating point", "Operating point"]
     return md_table(doc, headers, rows, "lrrrl")
+
+
+def by_load_block(doc: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """The reference system's `cost_by_load` (scripts/compare.py), or None when it has no benchmark levels."""
+    block = (by_name(doc).get(doc["reference"]) or {}).get("cost_by_load")
+    return block if block and block["levels"] else None
+
+
+def _or_dash(value: float | None, fmt: Callable[[float], str]) -> str:
+    return "-" if value is None else fmt(value)
+
+
+def by_load_table(doc: Mapping[str, Any], *, compact: bool = False) -> str | None:
+    """The reference system's cost and latency at every measured load level, none picked as the headline.
+
+    The operating point, when a level met the rule, is marked. The full table also lists, for each level, the APIs
+    whose whole break-even range one GPU can serve there (left out when no API has a break-even volume). `compact`
+    (the write-up) keeps the load, p95, the cost at the on-demand price with the spot price beside it, and what one
+    GPU serves a month.
+    """
+    block = by_load_block(doc)
+    if block is None:
+        return None
+    apis = (doc.get("break_even") or {}).get("apis") or {}
+    rows = []
+    for level in block["levels"]:
+        load = level["concurrency"]
+        per_1k = level["per_1k_calls_usd"]
+        on_demand, spot = _or_dash(per_1k.get("on_demand"), usd), _or_dash(per_1k.get("spot"), usd)
+        label = f"{load} (operating point)" if load == block["operating_point"] else load
+        p95, capacity = _or_dash(level["p95_s"], seconds), _or_dash(level["capacity_calls_per_month"], count)
+        if compact:
+            seconds_95 = _or_dash(level["p95_s"], lambda value: f"{value:.2f}")  # the unit is in the header
+            rows.append([label, seconds_95, on_demand if spot == "-" else f"{on_demand} ({spot})", capacity])
+            continue
+        flags = {name: (entry.get("within_capacity_by_concurrency") or {}).get(str(load)) or {} for name, entry in apis.items()}
+        served = [_code(name) for name, flag in flags.items() if flag and all(v is True for v in flag.values())]
+        rows.append(
+            [label, _or_dash(level["requests_per_s"], per_second), _or_dash(level["p50_s"], seconds), p95, on_demand, spot, capacity]
+            + ([", ".join(served) or "none"] if apis else [])
+        )
+    if compact:
+        headers = ["Concurrency", "p95 (s)", "On-demand (spot) per 1,000 calls", "Calls one GPU serves a month"]
+        return md_table(doc, headers, rows, "rrrr")
+    headers = [
+        "Concurrency", "Requests/s", "p50", "p95", "Cost per 1,000 calls, on-demand", "Cost per 1,000 calls, spot",
+        "Calls one GPU serves a month",
+    ]
+    if apis:
+        headers.append("APIs whose break-even range one GPU can serve")
+    return md_table(doc, headers, rows, "r" * 7 + ("l" if apis else ""))
 
 
 def api_latency_table(doc: Mapping[str, Any]) -> str | None:
@@ -579,6 +650,7 @@ def build_context(root: Path, results_dir: Path, config_dir: Path, *, need_datas
         "headline_subset": None,
         "subset_sizes": {},
         "pending_names": "",
+        "by_load": None,
         "api_latency": {},
         "api_latency_label": API_LATENCY_LABEL,
     }
@@ -598,13 +670,21 @@ def comparison_context(doc: Mapping[str, Any], dataset: Mapping[str, Any] | None
     named = by_name(doc)
     ref = named.get(doc["reference"])
     tables: dict[str, str] = {"accuracy": accuracy_table(doc), "accuracy_compact": accuracy_table(doc, compact=True), "other": other_metrics_table(doc)}
-    for key, table in (("cost", cost_table(doc)), ("latency", latency_table(doc)), ("api_latency", api_latency_table(doc)), ("scenario", scenario_table(doc))):
+    for key, table in (
+        ("cost", cost_table(doc)), ("cost_compact", cost_table(doc, compact=True)),
+        ("by_load", by_load_table(doc)), ("by_load_compact", by_load_table(doc, compact=True)),
+        ("latency", latency_table(doc)), ("api_latency", api_latency_table(doc)), ("scenario", scenario_table(doc)),
+    ):
         if table:
             tables[key] = table
+    block = by_load_block(doc)
+    by_load = block and {"note": block["note"], "operating_point": block["operating_point"]}
+    # With no operating point the by-load table already holds every level's latency; the latency table would show
+    # only the concurrency-1 numbers beside empty operating-point columns.
+    if by_load and not any(entry.get("operating_point") for entry in doc["latency"]["self_hosted"]["systems"].values()):
+        tables.pop("latency", None)
     ft_facts = None
     if ref and ref["metrics"]:
-        op = (doc["latency"]["self_hosted"]["systems"].get(ref["name"]) or {})
-        single, operating = op.get("concurrency_1") or {}, op.get("operating_point") or {}
         full = ref["full_test"]
         ft_facts = {
             "subset": ref["comparison_subset"],
@@ -614,12 +694,6 @@ def comparison_context(doc: Mapping[str, Any], dataset: Mapping[str, Any] | None
             "full_half_width": half_width(full["metrics"]["exact_match"]) if full else None,
             "unseen": ref["unseen_text"] and {"n": ref["unseen_text"]["n"], "excluded": ref["unseen_text"]["excluded"], "em": pct_interval(ref["unseen_text"])},
             "weakest": weakest_scenario(ref),
-            "p50_1": seconds(single["p50_s"]) if single.get("p50_s") is not None else None,
-            "p95_1": seconds(single["p95_s"]) if single.get("p95_s") is not None else None,
-            "p95_op": seconds(operating["p95_s"]) if operating.get("p95_s") is not None else None,
-            "op_concurrency": operating.get("concurrency"),
-            "op_rps": f"{operating['requests_per_s']:.1f}" if operating.get("requests_per_s") else None,
-            "capacity": count(ref["cost"]["capacity_calls_per_month"]) if ref["cost"] else None,
         }
     pair_widths = [(s["vs_reference"]["difference"]["ci95"][1] - s["vs_reference"]["difference"]["ci95"][0]) / 2 for s in doc["systems"] if s["vs_reference"]]
     be = doc.get("break_even") or {}
@@ -637,6 +711,7 @@ def comparison_context(doc: Mapping[str, Any], dataset: Mapping[str, Any] | None
             "price_basis": gpu["price_basis"].replace("_", "-"),
             "benchmark_gpu": ((doc.get("self_hosted") or {}).get("benchmark") or {}).get("gpu"),
         },
+        "by_load": by_load,
         "api_latency_label": doc["latency"]["api_appendix"]["label"],
         "api_latency": doc["latency"]["api_appendix"]["systems"],
         "model_index": model_index(ref, dataset) if dataset else [],

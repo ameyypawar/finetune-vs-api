@@ -15,9 +15,17 @@ Every system is compared with `{{ reference }}` on the items both have answered:
 {% if tables.cost is defined %}
 ### Cost and break-even
 
-Costs are what the same calls would cost at the providers' paid list prices, as a pair of bounds: with the static prompt prefix cached, and with no caching. The self-hosted cost is a rented GPU kept busy at the operating point. Break-even is the monthly volume above which a GPU rented around the clock ({{ hours_per_month }} hours a month, at the on-demand price) costs less than the API.
+Costs are what the same calls would cost at the providers' paid list prices, as a pair of bounds: with the static prompt prefix cached, and with no caching. The self-hosted cost is a rented GPU kept busy{% if not by_load or by_load.operating_point is not none %} at the operating point{% else %}; it has its own table below, at every measured load{% endif %}. Break-even is the monthly volume above which a GPU rented around the clock ({{ hours_per_month }} hours a month, at the on-demand price) costs less than the API.{% if by_load %} It does not depend on the load.{% endif +%}
 
 {{ tables.cost }}
+
+{% endif %}
+{% if tables.by_load is defined %}
+### Self-hosted cost and latency by load
+
+The fine-tune was measured on the box, with no network in the path, at every load level fixed in advance. {% if by_load.note %}{{ by_load.note }}{% else %}The operating point, the highest concurrency whose p95 stays within the limit, is marked.{% endif %} Each cost is a GPU rented at that price and kept busy at that load, at the on-demand price and at the spot price. The calls one GPU serves a month are its throughput at that load over {{ hours_per_month }} hours; a break-even volume can be reached on one GPU only at the loads where that figure is at least as large.
+
+{{ tables.by_load }}
 
 {% endif %}
 {% if tables.latency is defined %}

@@ -20,10 +20,12 @@ from finetune_vs_api import config
 from results_fixtures import (
     API_SYSTEMS,
     BASE,
+    BREAK_EVEN_SERVING,
     FT,
     GEMINI,
     GPT_OSS_20B,
     GPT_OSS_120B,
+    NO_OPERATING_POINT_SERVING,
     QWEN_27B,
     SYSTEMS,
     Lab,
@@ -60,6 +62,33 @@ def standard(tmp_path_factory):
         lab.write_error_analysis(["wrong intent", "wrong intent", "span boundary", "label noise"])
         doc = comparison_for(lab)
     figures.run(comparison_path=lab.results / "comparison.json", out=lambda line: None)
+    return lab, doc
+
+
+@pytest.fixture(scope="module")
+def no_operating_point(tmp_path_factory):
+    """The standard results with a benchmark in which no level meets the p95 limit, as on the real T4: four load levels."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(config, "git_commit", lambda cwd=None: None)
+        mp.setattr(config, "git_dirty", lambda cwd=None: False)
+        lab = Lab(tmp_path_factory.mktemp("render-no-operating-point")).populate()
+        lab.write_serving(doc=NO_OPERATING_POINT_SERVING)
+        lab.write_train_log()
+        lab.write_error_analysis(["wrong intent", "wrong intent", "span boundary", "label noise"])
+        doc = comparison_for(lab)
+    figures.run(comparison_path=lab.results / "comparison.json", out=lambda line: None)
+    return lab, doc
+
+
+@pytest.fixture(scope="module")
+def straddling(tmp_path_factory):
+    """Levels that serve some API break-even volumes at one cost bound only (see BREAK_EVEN_SERVING)."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(config, "git_commit", lambda cwd=None: None)
+        mp.setattr(config, "git_dirty", lambda cwd=None: False)
+        lab = Lab(tmp_path_factory.mktemp("render-straddling")).populate()
+        lab.write_serving(doc=BREAK_EVEN_SERVING)
+        doc = comparison_for(lab)
     return lab, doc
 
 
@@ -133,6 +162,14 @@ def tables_in(text: str) -> list[tuple[list[str], str]]:
 
 def table_rows(table: list[str]) -> list[list[str]]:
     return [[c.strip() for c in line.strip().strip("|").split(" | ")] for line in table[2:]]
+
+
+def by_load_table(text: str) -> tuple[list[str], dict[str, list[str]], str]:
+    """The cost-and-latency-by-load table of a document: its header cells, its rows by the Concurrency cell, and the
+    first line after it (which must be the notice)."""
+    table, after = next(t for t in tables_in(text) if t[0][0].startswith("| Concurrency"))
+    header = [c.strip() for c in table[0].strip().strip("|").split(" | ")]
+    return header, {row[0]: row for row in table_rows(table)}, after
 
 
 def front_matter(card: str) -> dict:
@@ -591,6 +628,18 @@ def test_the_writeup_is_a_draft_of_800_to_1200_words_with_results_and_without(st
     assert 800 <= words(without.read("docs/writeup.md")) <= 1200
 
 
+def test_the_writeup_stays_within_1200_words_at_the_scale_of_the_real_benchmark(no_operating_point, tmp_path):
+    """Four load levels and no operating point (the real T4), with the error analysis written and while it is still the
+    slot's own text (the longer draft). The by-load table and its notice are most of what the write-up gained."""
+    lab, _ = no_operating_point
+    written = Repo.with_results(tmp_path / "written", lab)
+    slot = Repo.with_results(tmp_path / "slot", lab, analysis=False)
+    for repo in (written, slot):
+        repo.render("writeup")
+        assert 800 <= words(repo.read("docs/writeup.md")) <= 1200
+    assert "This is the slot for the hand-labelled error analysis" in slot.read("docs/writeup.md")
+
+
 def test_the_writeup_has_its_sections_in_order(standard, tmp_path):
     lab, _ = standard
     repo = Repo.with_results(tmp_path / "repo", lab)
@@ -640,13 +689,13 @@ def unfenced_lines(text: str) -> list[tuple[int, str]]:
     return keep
 
 
-@pytest.mark.parametrize("state", ["results", "no results"])
-def test_every_heading_has_a_blank_line_before_and_after_it(standard, tmp_path, state):
-    lab, _ = standard
-    repo = Repo.with_results(tmp_path / "repo", lab) if state == "results" else Repo.committed(tmp_path / "repo")
+@pytest.mark.parametrize("state", ["results", "no results", "no operating point"])
+def test_every_heading_has_a_blank_line_before_and_after_it(standard, no_operating_point, tmp_path, state):
+    lab, _ = no_operating_point if state == "no operating point" else standard
+    repo = Repo.committed(tmp_path / "repo") if state == "no results" else Repo.with_results(tmp_path / "repo", lab)
     repo.render()
     documents = {"hf/README.md": repo.read("hf/README.md"), "docs/writeup.md": repo.read("docs/writeup.md")}
-    if state == "results":
+    if state != "no results":
         documents["README.md"] = repo.read("README.md")
     for name, text in documents.items():
         lines = text.splitlines()
@@ -667,8 +716,11 @@ def test_the_writeup_gives_the_cost_break_even_and_latency_from_the_results(stan
     # groq-qwen3.8-27b has no cached-input price, so both ends of its cost and its break-even are the same figure
     assert re.search(rf"\| `{QWEN_27B}` \| paid list price \| (\$[\d.,]+) to \1 \| ([\d,]+) to \2 \|", text)
     assert "rented around the clock for 730 hours at the on-demand price ($0.5 an hour) costs $365.00 a month" in text
-    assert "one GPU serves 26,280,000 calls a month" in text
-    assert "answers in 0.40 s at p50 and 0.60 s at p95 for a single stream, and 1.20 s at p95 under load" in text
+    # what one GPU serves and the latency, at the operating point and at a single stream, are rows of the by-load table
+    # (they were a sentence before: 26,280,000 calls a month; p95 1.20 s under load and 0.60 s for a single stream)
+    _, rows, _ = by_load_table(text)
+    assert rows["8 (operating point)"] == ["8 (operating point)", "1.20", "$0.0139 ($0.0069)", "26,280,000"]
+    assert rows["1"] == ["1", "0.60", "$0.0694 ($0.0347)", "5,256,000"]
     assert "Latency of the API systems, observed on free tiers from India; not representative of paid tiers:" in text
 
 
@@ -732,6 +784,198 @@ def test_figures_are_linked_only_when_they_exist(standard, tmp_path):
     without = Repo.with_results(tmp_path / "without", lab, figures_=False)
     without.render()
     assert "![" not in without.region() and "![" not in without.read("docs/writeup.md")
+
+
+# --- the table of cost and latency by load ---------------------------------------------------------------------------------------
+
+NO_OPERATING_POINT_NOTE = "No level met the p95 <= 1 s rule, so cost is reported at every measured level instead."
+FULL_HEADERS = [
+    "Concurrency", "Requests/s", "p50", "p95", "Cost per 1,000 calls, on-demand", "Cost per 1,000 calls, spot",
+    "Calls one GPU serves a month", "APIs whose break-even range one GPU can serve",
+]
+COMPACT_HEADERS = ["Concurrency", "p95 (s)", "On-demand (spot) per 1,000 calls", "Calls one GPU serves a month"]
+ALL_APIS = ", ".join(f"`{name}`" for name in API_SYSTEMS)  # in the order of configs/systems.yaml
+#: The levels of NO_OPERATING_POINT_SERVING worked out by hand at $0.50 and $0.25 an hour: requests/s, p50, p95, cost per
+#: 1,000 calls at each price (0.5 / 3600 / rate * 1000), and the calls one GPU serves a month (rate * 3,600 * 730).
+BY_LOAD_ROWS = {
+    "1": ["1", "1.00", "1.26 s", "2.27 s", "$0.139", "$0.0694", "2,628,000"],
+    "8": ["8", "5.00", "1.47 s", "2.57 s", "$0.0278", "$0.0139", "13,140,000"],
+    "32": ["32", "15.00", "2.16 s", "3.69 s", "$0.0093", "$0.0046", "39,420,000"],
+    "64": ["64", "20.00", "2.86 s", "4.67 s", "$0.0069", "$0.0035", "52,560,000"],
+}
+
+
+def test_the_by_load_table_is_in_the_readme_the_card_and_the_writeup_with_every_level(no_operating_point, tmp_path):
+    lab, doc = no_operating_point
+    repo = Repo.with_results(tmp_path / "repo", lab)
+    repo.render()
+    readme, card, writeup = repo.region(), repo.read("hf/README.md"), repo.read("docs/writeup.md")
+    for text in (readme, card):  # the full table: throughput, p50 and p95, both prices, what one GPU serves, which APIs it beats
+        header, rows, after = by_load_table(text)
+        assert header == FULL_HEADERS and list(rows) == list(BY_LOAD_ROWS)
+        for load, expected in BY_LOAD_ROWS.items():
+            assert rows[load] == [*expected, ALL_APIS], load
+        assert after.startswith(NOTICE)  # the table is built by md_table, so the notice and the sources follow it
+    header, rows, after = by_load_table(writeup)  # the compact one, for a write-up of at most 1,200 words
+    assert header == COMPACT_HEADERS and list(rows) == list(BY_LOAD_ROWS) and after.startswith(NOTICE)
+    for load, row in BY_LOAD_ROWS.items():
+        _, _, _, p95, on_demand, spot, calls = row
+        assert rows[load] == [load, p95.removesuffix(" s"), f"{on_demand} ({spot})", calls], load
+    block = next(s for s in doc["systems"] if s["name"] == FT)["cost_by_load"]  # the cells come from the comparison
+    assert [level["concurrency"] for level in block["levels"]] == [1, 8, 32, 64]
+
+
+def test_the_note_says_plainly_that_no_level_met_the_rule_and_nothing_is_marked_as_the_headline(no_operating_point, standard, tmp_path):
+    lab, doc = no_operating_point
+    assert doc["systems"][0]["cost_by_load"]["note"] == NO_OPERATING_POINT_NOTE  # the sentence is the comparison's, not the template's
+    repo = Repo.with_results(tmp_path / "repo", lab)
+    repo.render()
+    for name, text in (("README.md", repo.region()), ("hf/README.md", repo.read("hf/README.md")), ("docs/writeup.md", repo.read("docs/writeup.md"))):
+        assert NO_OPERATING_POINT_NOTE in text, name
+        assert "(operating point)" not in text and "The operating point" not in text, name  # no level is picked
+    # the cost table has no self-hosted row either: nothing is priced at a level the rule did not choose
+    assert f"| `{FT}` | GPU rental" not in repo.region()
+    # with an operating point, the same documents mark it and make no claim that the rule failed
+    other = Repo.with_results(tmp_path / "other", standard[0])
+    other.render()
+    for name, text in (("README.md", other.region()), ("hf/README.md", other.read("hf/README.md")), ("docs/writeup.md", other.read("docs/writeup.md"))):
+        assert "No level met" not in text and "The operating point" in text, name
+        assert list(by_load_table(text)[1]) == ["1", "8 (operating point)"], name  # only that row carries the mark
+
+
+def test_the_latency_table_gives_way_to_the_by_load_table_only_when_there_is_no_operating_point(standard, no_operating_point, tmp_path):
+    with_point = Repo.with_results(tmp_path / "with", standard[0])
+    with_point.render("readme")
+    assert "### Self-hosted latency" in with_point.region() and "### Self-hosted cost and latency by load" in with_point.region()
+    assert "p95 at the operating point" in with_point.region()  # unchanged when a level met the rule
+    without = Repo.with_results(tmp_path / "without", no_operating_point[0])
+    without.render("readme")
+    assert "### Self-hosted latency" not in without.region() and "p95 at the operating point" not in without.region()
+    assert "### Self-hosted cost and latency by load" in without.region()
+    assert "results/figures/latency.png" not in without.region()  # that figure shows a single stream and the operating point
+    assert "it has its own table below, at every measured load" in without.region()
+    assert "kept busy at the operating point" in with_point.region() and "own table below" not in with_point.region()
+
+
+def test_the_cost_table_keeps_its_self_hosted_row_when_a_level_met_the_rule(standard, tmp_path):
+    repo = Repo.with_results(tmp_path / "repo", standard[0])
+    repo.render()
+    for text in (repo.region(), repo.read("docs/writeup.md")):
+        table = next(t for t in tables_in(text) if t[0][0].startswith("| System | Priced as"))[0]
+        assert table_rows(table)[0][:2] == [f"`{FT}`", "GPU rental at the on-demand price, kept busy"]
+
+
+def test_the_per_level_column_lists_the_apis_whose_whole_break_even_range_one_gpu_can_serve(straddling, tmp_path):
+    lab, _ = straddling
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    served = {load: row[7] for load, row in by_load_table(repo.region())[1].items()}
+    # the levels serve 131,400 / 262,800 / 525,600 / 788,400 / 1,051,200 calls a month (tests/results_fixtures.py): an API
+    # counts only when both ends of its break-even range fit, so gemini at 262,800 (260,714 to 365,000) does not
+    assert served == {
+        "1": "none",
+        "2": "`groq-qwen3.8-27b-k10`",
+        "4": "`groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10`",
+        "8": "`groq-gpt-oss-20b-k10`, `groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10`",
+        "16": ALL_APIS,
+    }
+
+
+def test_without_a_benchmark_there_is_no_by_load_table_or_section(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
+    monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
+    lab = Lab(tmp_path / "lab")
+    lab.write_run(FT)
+    lab.write_run(GPT_OSS_20B)
+    lab.write_audit()
+    lab.write_subsets()
+    comparison_for(lab)
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    for text in (repo.region(), repo.read("hf/README.md"), repo.read("docs/writeup.md")):
+        assert not [t for t in tables_in(text) if t[0][0].startswith("| Concurrency")]
+    assert "### Self-hosted cost and latency by load" not in repo.region() and "### Serving cost and latency" not in repo.read("hf/README.md")
+    assert "It does not depend on the load" not in repo.region() and "own table below" not in repo.region()
+
+
+def test_with_no_priced_api_the_by_load_table_has_no_feasibility_column_but_still_appears(tmp_path, monkeypatch):
+    """A benchmark and the fine-tune's run, and no API row to compare the break-even with."""
+    monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
+    monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
+    lab = Lab(tmp_path / "lab")
+    lab.write_run(FT)
+    lab.write_serving(doc=NO_OPERATING_POINT_SERVING)
+    lab.write_audit()
+    lab.write_subsets()
+    comparison_for(lab)
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False, train_log=False, analysis=False)
+    repo.render()
+    for text in (repo.region(), repo.read("hf/README.md")):
+        header, rows, after = by_load_table(text)
+        assert header == FULL_HEADERS[:-1] and after.startswith(NOTICE)
+        assert all(len(row) == len(header) for row in rows.values())  # every row has as many cells as the header
+        assert rows["8"] == BY_LOAD_ROWS["8"]
+    writeup = repo.read("docs/writeup.md")
+    assert by_load_table(writeup)[0] == COMPACT_HEADERS and NO_OPERATING_POINT_NOTE in writeup
+    assert "API costs are computed from tokens" not in writeup  # the section is not the no-results draft
+    assert "### Cost and break-even" not in repo.region() and "### Self-hosted cost and latency by load" in repo.region()  # no API cost table, so no such section
+
+
+def test_the_model_card_has_a_serving_section_only_when_results_exist(no_operating_point, tmp_path):
+    repo = Repo.with_results(tmp_path / "with", no_operating_point[0])
+    repo.render("card")
+    card = repo.read("hf/README.md")
+    assert "\n### Serving cost and latency\n" in card and card.index("### Serving cost and latency") < card.index("## Limitations")
+    assert card.index("### Serving cost and latency") > card.index("## Evaluation")
+    without = Repo.committed(tmp_path / "without")
+    without.render("card")
+    assert "Serving cost and latency" not in without.read("hf/README.md")
+
+
+def test_with_no_results_the_committed_generated_files_do_not_change(tmp_path):
+    """The by-load section exists only in the results branches of the templates: the three committed files stay as they are."""
+    repo = Repo.committed(tmp_path / "repo")
+    for optional in ("results/train_log.json", "results/error_analysis.csv", "docs/error_analysis.md"):  # inputs the real files used
+        if (ROOT / optional).exists():
+            repo.path(optional).parent.mkdir(exist_ok=True)
+            shutil.copy(ROOT / optional, repo.path(optional))
+    code, _ = repo.render()
+    assert code == 0
+    for name in ("README.md", "hf/README.md", "docs/writeup.md"):
+        assert repo.path(name).read_bytes() == (ROOT / name).read_bytes(), name
+    assert "Concurrency" not in repo.read("docs/writeup.md") and "by load" not in repo.read("hf/README.md")
+
+
+@pytest.mark.parametrize("state", ["results", "no operating point", "no results"])
+def test_no_generated_line_ends_in_whitespace(standard, no_operating_point, tmp_path, state):
+    """Jinja's block tags swallow or leave newlines and spaces at the end of a line; a stray one shows up here."""
+    lab, _ = no_operating_point if state == "no operating point" else standard
+    repo = Repo.committed(tmp_path / "repo") if state == "no results" else Repo.with_results(tmp_path / "repo", lab)
+    repo.render()
+    for name in ("README.md", "hf/README.md", "docs/writeup.md"):
+        lines = repo.read(name).split("\n")
+        assert [n for n, line in enumerate(lines, start=1) if line != line.rstrip()] == [], name
+
+
+def test_the_compact_tables_drop_a_column_only_where_every_row_says_the_same(standard, no_operating_point, smaller, tmp_path):
+    # exact match: "Items" is the same on every row of the standard results, so the write-up leaves it to its setup paragraph
+    plain = Repo.with_results(tmp_path / "plain", standard[0])
+    plain.render()
+    header = next(t for t in tables_in(plain.read("docs/writeup.md")) if t[0][0].startswith("| System"))[0][0]
+    assert "Items" not in header and "McNemar" not in header and "Full test split" not in header
+    assert "| System | Items | Exact match |" in plain.region()  # the README keeps it
+    # ... but it stays when a row differs (one is on the S300 subset)
+    lab, _ = smaller
+    mixed = Repo.with_results(tmp_path / "mixed", lab, figures_=False, train_log=False, analysis=False)
+    mixed.render()
+    table = next(t for t in tables_in(mixed.read("docs/writeup.md")) if t[0][0].startswith("| System"))[0]
+    assert "Items" in table[0] and any("S300 (300)" in row for row in table[2:])
+    # cost: "Priced as" is dropped when every priced row is an API row (the notice says list prices), and kept beside a rental row
+    no_point = Repo.with_results(tmp_path / "no-point", no_operating_point[0])
+    no_point.render()
+    cost_header = next(t for t in tables_in(no_point.read("docs/writeup.md")) if "Break-even" in t[0][0])[0][0]
+    assert "Priced as" not in cost_header and "| System | Cost per 1,000 calls" in cost_header
+    assert "| System | Priced as |" in no_point.region()  # the README keeps it
 
 
 # --- partial and warned results ---------------------------------------------------------------------------------------------------

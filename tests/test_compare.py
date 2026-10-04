@@ -10,15 +10,17 @@ import numpy as np
 import pytest
 import yaml
 
-from conftest import load_script
+from conftest import ROOT, load_script
 from finetune_vs_api import config, metrics
 from results_fixtures import (
     API_SYSTEMS,
     BASE,
+    BREAK_EVEN_SERVING,
     FT,
     GEMINI,
     GPT_OSS_20B,
     GPT_OSS_120B,
+    NO_OPERATING_POINT_SERVING,
     QWEN_27B,
     STUB_MODEL,
     SYSTEMS,
@@ -26,8 +28,10 @@ from results_fixtures import (
 )
 
 compare = load_script("compare")
+bench_throughput = load_script("bench_throughput")
 N = 200  # bootstrap resamples: enough to be stable, small enough to be quick
 GOOD_LEVEL = {"concurrency": 1, "requests_per_s": 1, "latency_s": {"p50": 0.1, "p95": 0.2}}
+REAL_T4 = ROOT / "results" / "serving" / "T4.json"
 
 
 def quiet_git(monkeypatch):
@@ -59,6 +63,28 @@ def mixed(tmp_path_factory):
         lab = Lab(tmp_path_factory.mktemp("mixed"))
         lab.move_to_subset(GEMINI, "S300")
         lab.populate()
+        doc = build(lab)
+    return lab, doc
+
+
+@pytest.fixture(scope="module")
+def no_operating_point(tmp_path_factory):
+    """The standard set with a benchmark in which no level meets the p95 <= 1 s rule, as on the real T4."""
+    with pytest.MonkeyPatch.context() as mp:
+        quiet_git(mp)
+        lab = Lab(tmp_path_factory.mktemp("no-operating-point")).populate()
+        lab.write_serving(doc=NO_OPERATING_POINT_SERVING)
+        doc = build(lab)
+    return lab, doc
+
+
+@pytest.fixture(scope="module")
+def straddling(tmp_path_factory):
+    """The standard set with levels that serve some API break-even volumes at one bound only."""
+    with pytest.MonkeyPatch.context() as mp:
+        quiet_git(mp)
+        lab = Lab(tmp_path_factory.mktemp("straddling")).populate()
+        lab.write_serving(doc=BREAK_EVEN_SERVING)
         doc = build(lab)
     return lab, doc
 
@@ -738,6 +764,231 @@ def test_an_unusable_benchmark_is_reported_not_guessed(tmp_path, monkeypatch, do
     out = build(lab)
     assert [w for w in out["warnings"] if problem in w and "results/serving/t4.json" in w]
     assert (system(out, FT)["cost"] is not None) == priced
+
+
+# --- cost by load: every measured level, no single operating point ---------------------------------------------------------------
+
+#: What one GPU serves a month at 1 request/s: 3,600 seconds an hour, 730 hours a month.
+CALLS_PER_MONTH_AT_ONE_PER_S = 3600 * 730
+NO_OPERATING_POINT_NOTE = "No level met the p95 <= 1 s rule, so cost is reported at every measured level instead."
+BENCHMARK_REASON = NO_OPERATING_POINT_SERVING["operating_point_note"]  # what the benchmark itself says about the missing point
+
+
+def test_with_no_operating_point_the_per_level_table_and_a_note_replace_the_single_cost(no_operating_point):
+    _, doc = no_operating_point
+    ft = system(doc, FT)
+    assert ft["cost"] is None  # the operating-point logic is as it was: nothing is priced at a level the rule did not choose
+    block = ft["cost_by_load"]
+    assert block["operating_point"] is None
+    assert block["note"] == NO_OPERATING_POINT_NOTE
+    assert block["basis"] == "aws-g4dn.xlarge rented at the on-demand and at the spot price, kept busy at each measured concurrency level"
+    assert block["usd_per_hour"] == {"on_demand": 0.5, "spot": 0.25}
+    assert [level["concurrency"] for level in block["levels"]] == [1, 8, 32, 64]
+    expected = [(1.0, 1.26, 2.27), (5.0, 1.47, 2.57), (15.0, 2.16, 3.69), (20.0, 2.86, 4.67)]
+    for level, (rate, p50, p95) in zip(block["levels"], expected, strict=True):
+        assert (level["requests_per_s"], level["p50_s"], level["p95_s"]) == (rate, p50, p95)
+        # $0.50 and $0.25 an hour, over 3,600 seconds and the requests a second, per 1,000 calls
+        assert level["per_1k_calls_usd"]["on_demand"] == pytest.approx(0.5 / 3600 / rate * 1000)
+        assert level["per_1k_calls_usd"]["spot"] == pytest.approx(0.25 / 3600 / rate * 1000)
+        assert level["capacity_calls_per_month"] == pytest.approx(rate * CALLS_PER_MONTH_AT_ONE_PER_S)
+    first = block["levels"][0]  # worked out by hand: 0.5 / 3.6 = 0.13889 and 0.25 / 3.6 = 0.06944, and 2,628,000 calls
+    assert first["per_1k_calls_usd"]["on_demand"] == pytest.approx(0.138889, rel=1e-5)
+    assert first["per_1k_calls_usd"]["spot"] == pytest.approx(0.069444, rel=1e-5)
+    assert first["capacity_calls_per_month"] == 2_628_000
+    assert any(f"no operating point ({BENCHMARK_REASON})" in w for w in doc["warnings"])  # the reason is still warned about
+    assert doc["latency"]["self_hosted"]["systems"][FT]["operating_point"] is None
+    assert doc["latency"]["self_hosted"]["systems"][FT]["concurrency_1"]["p95_s"] == 2.27  # concurrency 1 is still reported
+    for name in (BASE, *API_SYSTEMS):  # only the benchmarked self-hosted row has a table
+        assert system(doc, name)["cost_by_load"] is None
+
+
+
+def test_with_an_operating_point_it_is_priced_as_before_and_the_table_appears_too(standard):
+    _, doc = standard
+    ft = system(doc, FT)
+    block = ft["cost_by_load"]
+    assert block["operating_point"] == 8 and block["note"] is None
+    assert [level["concurrency"] for level in block["levels"]] == [1, 8]
+    at_operating_point = next(level for level in block["levels"] if level["concurrency"] == 8)
+    # the operating-point cost is the same figure as that row of the table (its own values are in
+    # test_self_hosted_cost_is_the_gpu_price_at_the_operating_point)
+    assert ft["cost"]["per_1k_calls_usd"] == pytest.approx(at_operating_point["per_1k_calls_usd"]["on_demand"])
+    assert ft["cost"]["capacity_calls_per_month"] == pytest.approx(at_operating_point["capacity_calls_per_month"])
+    assert ft["cost"]["requests_per_s"] == at_operating_point["requests_per_s"] == 10.0
+    one = next(level for level in block["levels"] if level["concurrency"] == 1)  # 2 requests/s at $0.50 and $0.25 an hour
+    assert one["per_1k_calls_usd"] == {"on_demand": pytest.approx(0.5 / 3600 / 2 * 1000), "spot": pytest.approx(0.25 / 3600 / 2 * 1000)}
+    assert one["capacity_calls_per_month"] == 2 * CALLS_PER_MONTH_AT_ONE_PER_S
+
+
+def test_a_break_even_volume_is_the_same_at_every_load_and_each_level_says_whether_one_gpu_serves_it(straddling, standard):
+    _, doc = straddling
+    _, other = standard  # the same prices, another benchmark
+    apis = doc["break_even"]["apis"]
+    for name in API_SYSTEMS:  # the volume is the GPU's month over the API's cost per call: the load does not enter it
+        assert apis[name]["calls_per_month"] == other["break_even"]["apis"][name]["calls_per_month"]
+    assert apis[GPT_OSS_20B]["calls_per_month"]["no_caching"] == pytest.approx(365.0 / 0.0012)
+    # (no caching, cached prefix) at the levels serving 131,400 / 262,800 / 525,600 / 788,400 / 1,051,200 calls a month
+    expected = {
+        GPT_OSS_20B: {"1": (False, False), "2": (False, False), "4": (True, False), "8": (True, True), "16": (True, True)},
+        GPT_OSS_120B: {"1": (False, False), "2": (False, False), "4": (False, False), "8": (True, False), "16": (True, True)},
+        QWEN_27B: {"1": (False, False), "2": (True, True), "4": (True, True), "8": (True, True), "16": (True, True)},
+        GEMINI: {"1": (False, False), "2": (True, False), "4": (True, True), "8": (True, True), "16": (True, True)},
+    }
+    assert set(expected) == set(API_SYSTEMS)
+    for name, by_level in expected.items():
+        got = apis[name]["within_capacity_by_concurrency"]
+        assert {level: (flags["no_caching"], flags["cached_prefix"]) for level, flags in got.items()} == by_level, name
+    assert apis[GPT_OSS_20B]["within_capacity"] == {"no_caching": None, "cached_prefix": None}  # no operating point: no capacity there
+
+
+def test_a_volume_exactly_at_what_one_gpu_serves_can_be_served():
+    rental = {"usd_per_hour": 0.5}
+    per_1k = {"upper": 1.0, "lower": 0.5}  # $365 a month over $0.001 and $0.0005 a call: 365,000 and 730,000 calls
+    volume = compare.api_break_even(per_1k, rental, None)["calls_per_month"]["no_caching"]
+    served = compare.api_break_even(per_1k, rental, None, {1: volume, 2: volume - 1, 3: 2 * volume})
+    assert served["within_capacity_by_concurrency"] == {
+        "1": {"no_caching": True, "cached_prefix": False},
+        "2": {"no_caching": False, "cached_prefix": False},
+        "3": {"no_caching": True, "cached_prefix": True},
+    }
+    assert compare.api_break_even(per_1k, rental, None)["within_capacity_by_concurrency"] == {}  # no levels, none asked
+
+
+def test_a_level_without_throughput_keeps_its_latency_and_gets_no_cost_or_capacity(tmp_path, monkeypatch):
+    quiet_git(monkeypatch)
+    lab = Lab(tmp_path)
+    lab.write_run(FT)
+    lab.write_run(GPT_OSS_20B)
+    lab.write_serving(
+        doc={
+            "gpu": "T4", "system": FT, "operating_point": 1,
+            "levels": [
+                {"concurrency": 1, "requests_per_s": 2.0, "latency_s": {"p50": 0.4, "p95": 0.6}},
+                {"concurrency": 8, "requests_per_s": 0, "latency_s": {"p50": 9.0, "p95": 9.5}},  # nothing got through
+                {"concurrency": 32, "latency_s": {"p50": 9.0, "p95": 9.5}},  # no throughput recorded at all
+            ],
+        }
+    )
+    doc = build(lab)
+    levels = {level["concurrency"]: level for level in system(doc, FT)["cost_by_load"]["levels"]}
+    assert levels[1]["per_1k_calls_usd"]["on_demand"] == pytest.approx(0.5 / 3600 / 2.0 * 1000)
+    for concurrency in (8, 32):
+        assert levels[concurrency]["per_1k_calls_usd"] == {"on_demand": None, "spot": None}  # never a guessed cost
+        assert levels[concurrency]["capacity_calls_per_month"] is None and levels[concurrency]["p95_s"] == 9.5
+    flags = doc["break_even"]["apis"][GPT_OSS_20B]["within_capacity_by_concurrency"]
+    assert flags["1"] == {"no_caching": True, "cached_prefix": True}
+    assert flags["8"] == flags["32"] == {"no_caching": None, "cached_prefix": None}
+    assert any("concurrency 32 lacks" in w for w in doc["warnings"])  # the benchmark reader's own warning stands
+    json.dumps(doc, allow_nan=False)
+
+
+def test_without_a_spot_price_only_the_on_demand_cost_is_given(tmp_path, monkeypatch):
+    quiet_git(monkeypatch)
+    lab = Lab(tmp_path)
+    lab.write_run(FT)
+    lab.write_serving()
+    del lab.sources["gpu_rental"]["aws-g4dn.xlarge"]["usd_per_hour"]["spot"]
+    (lab.config_dir / "sources.yaml").write_text(yaml.safe_dump(lab.sources, sort_keys=False), encoding="utf-8")
+    block = system(build(lab), FT)["cost_by_load"]
+    assert block["usd_per_hour"] == {"on_demand": 0.5, "spot": None}
+    assert [level["per_1k_calls_usd"]["spot"] for level in block["levels"]] == [None, None]
+    assert block["levels"][0]["per_1k_calls_usd"]["on_demand"] == pytest.approx(0.5 / 3600 / 2.0 * 1000)
+
+
+@pytest.mark.parametrize(
+    ("p95", "note"),
+    [
+        (0.2, compare.UNDECLARED_OPERATING_POINT_NOTE),  # within the limit, but the file declares no operating point
+        (1.0, compare.UNDECLARED_OPERATING_POINT_NOTE),  # "at most 1 s": a p95 of exactly 1 s meets the rule
+        (1.01, compare.NO_OPERATING_POINT_NOTE),  # every level missed it
+    ],
+)
+def test_the_note_claims_the_rule_failed_only_when_every_level_missed_it(tmp_path, monkeypatch, p95, note):
+    quiet_git(monkeypatch)
+    lab = Lab(tmp_path)
+    lab.write_run(FT)
+    lab.write_serving(doc={"gpu": "T4", "system": FT, "levels": [{"concurrency": 1, "requests_per_s": 1, "latency_s": {"p50": 0.1, "p95": p95}}]})
+    block = system(build(lab), FT)["cost_by_load"]  # no operating point declared in any of these files
+    assert block["operating_point"] is None
+    assert block["note"] == note and "every measured level" in block["note"]
+    assert ("No level met" in block["note"]) == (note == compare.NO_OPERATING_POINT_NOTE)
+
+
+def test_without_a_benchmark_there_is_no_per_level_table(tmp_path, monkeypatch):
+    quiet_git(monkeypatch)
+    lab = Lab(tmp_path)
+    lab.write_run(FT)
+    lab.write_run(GPT_OSS_20B)
+    doc = build(lab)
+    assert all(s["cost_by_load"] is None for s in doc["systems"])
+    assert doc["break_even"]["apis"][GPT_OSS_20B]["within_capacity_by_concurrency"] == {}
+
+
+def test_the_rule_the_note_names_is_the_one_the_benchmark_applies():
+    assert compare.P95_LIMIT_S == bench_throughput.DEFAULT_P95_LIMIT_S == 1.0
+    assert compare.NO_OPERATING_POINT_NOTE == NO_OPERATING_POINT_NOTE
+
+
+def test_the_report_says_how_the_self_hosted_row_was_priced(tmp_path, monkeypatch):
+    quiet_git(monkeypatch)
+    lab = Lab(tmp_path)
+    lab.write_run(FT)
+    lab.write_serving(doc=NO_OPERATING_POINT_SERVING)
+    lines: list[str] = []
+    code = compare.run(results_dir=lab.results, processed_dir=lab.processed, config_dir=lab.config_dir, n_resamples=50, out=lines.append)
+    assert code == 0
+    assert any(FT in line and "cost by load, 4 levels" in line and NO_OPERATING_POINT_NOTE in line for line in lines)
+
+
+# --- the real throughput benchmark ---------------------------------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not REAL_T4.exists(), reason="results/serving/T4.json is not in this checkout")
+def test_the_real_t4_benchmark_parses_through_normalize_benchmark():
+    raw = json.loads(REAL_T4.read_text(encoding="utf-8"))
+    entry = compare.normalize_benchmark(raw, "unused")[FT]
+    assert set(entry) == {"levels", "single_stream", "operating_point", "problems"}  # the keys other code relies on
+    assert [level["concurrency"] for level in entry["levels"]] == [1, 8, 32, 64]
+    for level, source in zip(entry["levels"], raw["levels"], strict=True):
+        assert set(level) == {"concurrency", "requests_per_s", "p50_s", "p95_s", "n"}
+        assert (level["requests_per_s"], level["p50_s"], level["p95_s"]) == (
+            source["requests_per_s"], source["latency_s"]["p50"], source["latency_s"]["p95"],
+        )
+    assert entry["single_stream"] == entry["levels"][0]
+    assert raw["operating_point"] is None and entry["operating_point"] is None
+    assert entry["problems"] == [f"no operating point ({raw['operating_point_note']})"]  # the only complaint is the missing point
+
+
+@pytest.mark.skipif(not REAL_T4.exists(), reason="results/serving/T4.json is not in this checkout")
+def test_the_real_t4_levels_are_priced_the_way_the_benchmark_prices_them():
+    """At the rental prices the file itself recorded, the table is the benchmark's own `cost.by_concurrency`."""
+    raw = json.loads(REAL_T4.read_text(encoding="utf-8"))
+    entry = compare.normalize_benchmark(raw, "unused")[FT]
+    recorded = raw["cost"]["rental"]
+    assert recorded["id"] == compare.GPU_RENTAL_ID
+    sources = {"gpu_rental": {recorded["id"]: {key: recorded[key] for key in ("gpu", "url", "retrieved_on", "usd_per_hour")}}}
+    block = compare.cost_by_load(compare.rental_entry(sources, []), compare.rental_prices(sources), entry)
+    assert block["operating_point"] is None and block["note"] == NO_OPERATING_POINT_NOTE
+    assert block["usd_per_hour"] == recorded["usd_per_hour"]  # on-demand and spot, as the file recorded them
+    assert [level["concurrency"] for level in block["levels"]] == [1, 8, 32, 64]
+    for level in block["levels"]:
+        theirs = raw["cost"]["by_concurrency"][str(level["concurrency"])]
+        assert level["per_1k_calls_usd"]["on_demand"] == pytest.approx(theirs["on_demand"], rel=1e-12)
+        assert level["per_1k_calls_usd"]["spot"] == pytest.approx(theirs["spot"], rel=1e-12)
+        assert level["capacity_calls_per_month"] == pytest.approx(level["requests_per_s"] * CALLS_PER_MONTH_AT_ONE_PER_S)
+
+
+@pytest.mark.skipif(not REAL_T4.exists(), reason="results/serving/T4.json is not in this checkout")
+def test_the_real_t4_file_is_the_one_compare_picks_for_the_rented_gpu(tmp_path):
+    """The file name and the GPU label are both read: the real file is found without a hint."""
+    results = tmp_path / "results"
+    (results / "serving").mkdir(parents=True)
+    (results / "serving" / "T4.json").write_text(REAL_T4.read_text(encoding="utf-8"), encoding="utf-8")
+    warnings: list[str] = []
+    found = compare.load_benchmark(results, "1x NVIDIA T4", FT, tmp_path, warnings)
+    assert found["path"] == "results/serving/T4.json" and found["gpu"] == "Tesla T4" and found["other_files"] == []
+    assert set(found["systems"]) == {FT} and found["systems"][FT]["operating_point"] is None
+    assert warnings == [f"results/serving/T4.json, {FT}: no operating point ({json.loads(REAL_T4.read_text())['operating_point_note']})"]
 
 
 # --- the command line ----------------------------------------------------------------------------------------------------------
