@@ -17,7 +17,9 @@ When a level met the operating-point rule it is labelled as the operating point 
 interval bar, as the single point did before; otherwise the bar is drawn once, at the cheapest level,
 which is clear of the API rows. An API's cost is a range at paid list price: the filled end is the
 no-caching bound, the hollow end the bound with the static prompt prefix cached. The vertical bars
-are 95% bootstrap intervals. Every row carries its name, so identity never rests on colour alone.
+are 95% bootstrap intervals. Every row carries its name, so identity never rests on colour alone. A name
+sits beside its own row: a place where another row's mark is at least as near the name as its own marks
+are is passed over for one beside its own marks, even one that overlaps a little (`AMBIGUOUS_COST`).
 
 Latency. Headline only: the fine-tune on the box, p50 and p95 at every measured concurrency level,
 with the operating point marked when a level met the rule and nothing marked when none did. API
@@ -264,14 +266,27 @@ def _usd(value: float, _position: int | None = None) -> str:
     return f"${value:g}"
 
 
+#: A reader attaches a label to the nearest mark, so a slot is ambiguous when a mark of another row is at least as near the
+#: label as the label's own marks are. What it costs, counted in overlaps: more than one, so that a slot beside the label's own
+#: mark with a small overlap beats a clean slot that reads as another row's label, and less than two.
+AMBIGUOUS_COST = 1.5
+
+
+def _gap(a: Bbox, b: Bbox) -> float:
+    """The distance in pixels between two boxes: 0 when they touch or overlap."""
+    return math.hypot(max(a.x0 - b.x1, b.x0 - a.x1, 0.0), max(a.y0 - b.y1, b.y0 - a.y1, 0.0))
+
+
 def _place_labels(fig: Figure, ax, marks: Sequence[dict[str, Any]], obstacles: Sequence[Bbox]) -> None:
     """Direct labels. Each takes the first slot that overlaps no mark, no earlier label, and stays in the plot.
 
-    When no slot is free the one that overlaps least is used. `marks` hold the label text and the anchor points
-    its slots hang from (data coordinates): `low`, `middle` and `high` of the row's cost range, and the `top` and
-    `bottom` ends of its interval bar. A mark may name its own `slots` in place of LABEL_SLOTS, and then needs only
-    the parts they use. `obstacles` are boxes in pixels. A mark is placed after the ones before it, so the order
-    says which labels choose first.
+    A slot where another row's mark is at least as near the label as the label's own marks costs AMBIGUOUS_COST on top
+    of its overlaps. When no slot is free the one that costs least is used. `marks` hold the label text and the anchor
+    points its slots hang from (data coordinates): `low`, `middle` and `high` of the row's cost range, and the `top` and
+    `bottom` ends of its interval bar. A mark may name its own `slots` in place of LABEL_SLOTS, and then needs only the
+    parts they use. A mark may also list its row's own mark boxes as `own`: they are among the `obstacles`, which are
+    boxes in pixels, and every other obstacle belongs to another row. A mark is placed after the ones before it, so the
+    order says which labels choose first.
     """
     renderer = fig.canvas.get_renderer()
     taken = list(obstacles)
@@ -285,14 +300,23 @@ def _place_labels(fig: Figure, ax, marks: Sequence[dict[str, Any]], obstacles: S
         note.remove()
         return box
 
-    def cost(box: Bbox) -> float:
+    def ambiguous(box: Bbox, mark: dict[str, Any]) -> bool:
+        """Whether a mark of another row is at least as near the label as the label's own marks are."""
+        own = mark.get("own") or ()
+        if not own:
+            return False
+        mine = min(_gap(box, b) for b in own)
+        theirs = min((_gap(box, b) for b in obstacles if not any(b is o for o in own)), default=math.inf)
+        return theirs <= mine
+
+    def cost(box: Bbox, mark: dict[str, Any]) -> float:
         hits = sum(1 for other in taken if box.overlaps(other))
         outside = not (inside.x0 <= box.x0 and box.x1 <= inside.x1 and inside.y0 <= box.y0 and box.y1 <= inside.y1)
-        return hits + (1 if outside else 0)
+        return hits + (1 if outside else 0) + (AMBIGUOUS_COST if ambiguous(box, mark) else 0)
 
     for mark in marks:
-        scored = [(cost(measure(mark, slot)), n, slot) for n, slot in enumerate(mark.get("slots", LABEL_SLOTS))]
-        _, _, (part, dx, dy, ha, va) = min(scored)  # fewest overlaps; the earliest slot wins a tie
+        scored = [(cost(measure(mark, slot), mark), n, slot) for n, slot in enumerate(mark.get("slots", LABEL_SLOTS))]
+        _, _, (part, dx, dy, ha, va) = min(scored)  # the cheapest; the earliest slot wins a tie
         note = ax.annotate(mark["text"], mark[part], xytext=(dx, dy), textcoords="offset points",
                            ha=ha, va=va, fontsize=FONT, color=INK, annotation_clip=False)
         taken.append(note.get_window_extent(renderer))
@@ -374,8 +398,10 @@ def plot_accuracy_vs_cost(doc: Mapping[str, Any]) -> Figure | None:
         x_high, _ = ax.transData.transform((p["x_high"], p["y"]))
         x_bar, y_low = ax.transData.transform((p["bar_x"], p["y_low"]))
         _, y_high = ax.transData.transform((p["bar_x"], p["y_high"]))
-        obstacles.append(Bbox([[x_low - reach, y_mid - reach], [x_high + reach, y_mid + reach]]))  # range and markers
-        obstacles.append(Bbox([[x_bar - 3, y_low], [x_bar + 3, y_high]]))  # the interval bar
+        range_box = Bbox([[x_low - reach, y_mid - reach], [x_high + reach, y_mid + reach]])  # range and markers
+        bar_box = Bbox([[x_bar - 3, y_low], [x_bar + 3, y_high]])  # the interval bar
+        obstacles += [range_box, bar_box]
+        own = (range_box, bar_box)  # what a label of this row must stay nearer to than to any other row's marks
         names.append(
             {
                 "text": p["name"],
@@ -384,11 +410,12 @@ def plot_accuracy_vs_cost(doc: Mapping[str, Any]) -> Figure | None:
                 "middle": ((p["x_low"] * p["x_high"]) ** 0.5, p["y"]),
                 "top": (p["bar_x"], p["y_high"]),
                 "bottom": (p["bar_x"], p["y_low"]),
+                "own": own,
             }
         )
         for level in p["levels"]:  # the load a marker stands for, hung from the marker itself
             spot = (level["x"], p["y"])
-            loads.append({"text": level["text"], "low": spot, "high": spot, "middle": spot, "slots": LEVEL_SLOTS})
+            loads.append({"text": level["text"], "low": spot, "high": spot, "middle": spot, "slots": LEVEL_SLOTS, "own": own})
     _place_labels(fig, ax, names + loads, obstacles)  # every name chooses its place before any load label does
 
     chain = bool(loads)

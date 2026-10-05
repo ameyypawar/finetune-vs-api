@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import os
+import re
 import subprocess
 import sys
 
@@ -654,6 +656,217 @@ def test_the_fallback_slots_change_nothing_where_the_first_slots_were_already_cl
         with monkeypatch.context() as patched:
             patched.setattr(figures, "LABEL_SLOTS", plain_slots())
             assert label_boxes(figures.plot_accuracy_vs_cost(doc)) == with_fallbacks
+
+
+# --- every name beside its own row ---------------------------------------------------------------------------------------
+
+
+#: The dry run of 2026-10-05: the API rows at their S500 exact match and cost per 1,000 calls, gpt-oss-20b still partial (413
+#: of 500 items, so its final values will move a little). On this layout the Qwen name used to land far left of its own point
+#: ($0.88), over the top of Gemini's no-caching bar ($0.36), where a reader took it for Gemini's.
+DRY_RUN_RESULTS = {
+    FT: (0.75, (0.712, 0.788), None),
+    GPT_OSS_20B: (0.6198547, (0.5738499, 0.6682809), {"lower": 0.1072727, "upper": 0.1291987}),
+    GPT_OSS_120B: (0.63, (0.588, 0.674), {"lower": 0.2166591, "upper": 0.2599341}),
+    QWEN_27B: (0.708, (0.668, 0.748), {"lower": 0.8960672, "upper": 0.8960672}),
+    GEMINI: (0.678, (0.636, 0.718), {"lower": 0.2003744, "upper": 0.3561644}),
+}
+
+
+def gap(a, b):
+    """The distance in pixels between two boxes given as (x0, y0, x1, y1): 0 when they touch or overlap."""
+    return math.hypot(max(a[0] - b[2], b[0] - a[2], 0), max(a[1] - b[3], b[1] - a[3], 0))
+
+
+def row_marks(fig, doc, pad=2):
+    """Everything drawn for each row as boxes in pixels (its markers, its range or chain line, its interval bar), found from
+    the artists and attributed to a row by the exact match it is drawn at (a marker or a line) or by its interval (a bar),
+    not from the placement code."""
+    _render(fig)
+    ax = fig.axes[0]
+    results = {
+        s["name"]: (round(s["metrics"]["exact_match"]["value"], 12), tuple(round(v, 12) for v in s["metrics"]["exact_match"]["ci95"]))
+        for s in doc["systems"]
+        if (s.get("metrics") or {}).get("exact_match") is not None
+    }
+    by_value = {value: name for name, (value, _) in results.items()}
+    by_interval = {interval: name for name, (_, interval) in results.items()}
+    assert len(by_value) == len(by_interval) == len(results)  # attribution by data needs distinct results
+    marks: dict[str, list] = {name: [] for name in results}
+    transform = ax.transData.transform
+    for line in ax.lines:
+        owner = by_value.get(round(line.get_ydata()[0], 12))
+        if owner:
+            (x, y), r = transform((line.get_xdata()[0], line.get_ydata()[0])), line.get_markersize() * fig.dpi / 72 / 2
+            marks[owner].append((x - r, y - r, x + r, y + r))
+    for collection in ax.collections:
+        for (x0, y0), (x1, y1) in collection.get_segments():
+            owner = by_interval.get((round(y0, 12), round(y1, 12))) if x0 == x1 else by_value.get(round(y0, 12))
+            if owner:
+                (px0, py0), (px1, py1) = transform((x0, y0)), transform((x1, y1))
+                marks[owner].append((min(px0, px1) - pad, min(py0, py1) - pad, max(px0, px1) + pad, max(py0, py1) + pad))
+    return {name: boxes for name, boxes in marks.items() if boxes}
+
+
+LOAD_LABEL = re.compile(r"^x\d+( \(operating point\))?$")
+
+
+def assert_labels_beside_their_own_rows(fig, doc):
+    """Every row's name, and every load label of the fine-tune's row, is nearer to a mark of its own row than to any mark of
+    any other row."""
+    renderer = _render(fig)
+    rows = row_marks(fig, doc)
+    owners = {}  # label -> the row it belongs to
+    for text in fig.axes[0].texts:
+        label = text.get_text()
+        if label in rows:
+            owners[label] = label
+        elif LOAD_LABEL.match(label):
+            owners[label] = doc["reference"]
+    assert set(owners.values()) == set(rows) and len([o for label, o in owners.items() if label != o]) >= 1  # not vacuous
+    for text in fig.axes[0].texts:
+        label = text.get_text()
+        extents = text.get_window_extent(renderer)
+        box = (extents.x0, extents.y0, extents.x1, extents.y1)
+        own = min(gap(box, mark) for mark in rows[owners[label]])
+        theirs, other = min((gap(box, mark), name) for name, marks in rows.items() if name != owners[label] for mark in marks)
+        assert own < theirs, f"{label} is {own:.0f} px from its own marks and {theirs:.0f} px from those of {other}"
+
+
+@pytest.mark.parametrize("operating", [None, 8], ids=["no operating point", "operating point at 8"])
+def test_on_the_dry_run_every_name_sits_beside_its_own_row(world, monkeypatch, operating):
+    """Every name, and every load label, is nearer its own row than any other. The first slot free of marks for the Qwen name
+    was above-left of its point, 274 px wide and over the top of Gemini's bar, nearer Gemini's mark than Qwen's. A slot nearer
+    another row's mark than its own now costs more than a small overlap, so the name goes beside its own point, where there
+    is plenty of room."""
+    _, doc, _ = world
+    crowd = priced_at_the_real_sweep(doc, operating)
+    set_results(crowd, DRY_RUN_RESULTS)
+    with monkeypatch.context() as patched:  # not vacuous: with no cost for it, the old placement is back, and reads as Gemini's
+        patched.setattr(figures, "AMBIGUOUS_COST", 0)
+        fig = figures.plot_accuracy_vs_cost(crowd)
+        with pytest.raises(AssertionError, match=f"{QWEN_27B} is"):
+            assert_labels_beside_their_own_rows(fig, crowd)
+    fig = figures.plot_accuracy_vs_cost(crowd)
+    assert set(direct_labels(fig)) == every_label(operating)
+    assert_labels_clear(fig, direct_labels(fig))
+    assert_labels_beside_their_own_rows(fig, crowd)
+    x, _, _ = bar_pixels(fig, crowd, QWEN_27B)
+    assert label_box(fig, QWEN_27B).x0 > x  # Qwen's name stands to the right of its own point, in the free space there
+
+
+#: The dev-split rows tie on exact match (Qwen and Gemini both 0.82), and the measure attributes a mark to a row by the exact
+#: match it is drawn at, so Qwen is nudged by a tenth of a point here.
+DEV_SCALE_UNTIED = {**DEV_SCALE_RESULTS, QWEN_27B: (0.821, (0.786, 0.856), DEV_SCALE_RESULTS[QWEN_27B][2])}
+#: The real-scale and crowded layouts on which every label has a comfortable margin: another row's mark is at least a third
+#: farther from it than its own. The layout of the runs in progress is left out: the gpt-oss-120b name stands within 3 px of
+#: equally near to its own marker and to the foot of Gemini's bar, which the measure cannot call either way.
+NAME_LAYOUTS = {
+    "dry run": DRY_RUN_RESULTS, "dev runs": DEV_SCALE_UNTIED, "estimates": ESTIMATED_RESULTS, "crowded": CROWDED_RESULTS,
+}
+
+
+@pytest.mark.parametrize("operating", [None, 8], ids=["no operating point", "operating point at 8"])
+@pytest.mark.parametrize("results", list(NAME_LAYOUTS.values()), ids=list(NAME_LAYOUTS))
+def test_every_label_sits_nearer_its_own_row_than_any_other_on_the_real_scale_layouts(world, results, operating):
+    """Each row's name, and each load label of the fine-tune, is nearer its own row's marks than any other row's."""
+    _, doc, _ = world
+    crowd = priced_at_the_real_sweep(doc, operating)
+    set_results(crowd, results)
+    fig = figures.plot_accuracy_vs_cost(crowd)
+    assert_labels_beside_their_own_rows(fig, crowd)
+
+
+def test_the_gap_between_boxes_is_zero_when_they_touch_and_the_straight_distance_otherwise():
+    box = figures.Bbox([[0, 0], [10, 10]])
+    assert figures._gap(box, figures.Bbox([[10, 0], [20, 10]])) == 0  # touching
+    assert figures._gap(box, figures.Bbox([[5, 5], [20, 20]])) == 0  # overlapping
+    assert figures._gap(box, figures.Bbox([[13, 0], [20, 10]])) == 3  # beside it
+    assert figures._gap(box, figures.Bbox([[0, 14], [10, 20]])) == 4  # above it
+    other = figures.Bbox([[13, 14], [20, 20]])  # across a corner: the 3-4-5 triangle
+    assert figures._gap(box, other) == figures._gap(other, box) == 5
+
+
+ABOVE, BELOW = ("middle", 0, 30, "center", "bottom"), ("middle", 0, -30, "center", "top")
+
+
+def bare_axes():
+    """A 100 x 100 plot with nothing in it, drawn, so that data and pixel coordinates are fixed."""
+    fig = figures.plt.figure(figsize=(6, 4), dpi=100)
+    ax = fig.add_subplot()
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    fig.canvas.draw()
+    return fig, ax
+
+
+def slot_box(fig, ax, slot, anchor):
+    """The box in pixels that the label "row A" would take in `slot`, which leaves nothing on the axes."""
+    note = ax.annotate("row A", anchor, xytext=slot[1:3], textcoords="offset points", ha=slot[3], va=slot[4], fontsize=figures.FONT)
+    box = note.get_window_extent(fig.canvas.get_renderer())
+    note.remove()
+    return box
+
+
+def crossing(box, n=0):
+    """A thin box that stands across `box`: the foot of an interval bar, in the way of a label there."""
+    return figures.Bbox([[box.x0 + 8 + 12 * n, box.y0 - 4], [box.x0 + 12 + 12 * n, box.y1 + 4]])
+
+
+def row_a_goes_above(fig, ax, anchor, own, others, cost, monkeypatch, before=()):
+    """Whether the label of a row anchored at `anchor` takes ABOVE rather than BELOW, with AMBIGUOUS_COST set to `cost`.
+    `before` are marks placed first, whose labels are then among the labels already taken."""
+    mark = {"text": "row A", "middle": anchor, "own": own, "slots": (ABOVE, BELOW)}
+    with monkeypatch.context() as patched:
+        patched.setattr(figures, "AMBIGUOUS_COST", cost)
+        figures._place_labels(fig, ax, [*before, mark], [*own, *others])
+    return ax.texts[-1].get_window_extent(fig.canvas.get_renderer()).y0 > ax.transData.transform(anchor)[1]
+
+
+def test_a_slot_nearer_another_rows_mark_costs_more_than_one_overlap_and_less_than_two(monkeypatch):
+    """The cost of putting a name where it reads as another row's, in overlaps. A name with a clean slot above it that is 3 px
+    from a neighbour's mark and a slot below it that its own bar crosses takes the one with the small overlap; with two of
+    its own marks across the slot below it takes the clean one; and with no cost for ambiguity it takes the clean one."""
+    assert 1 < figures.AMBIGUOUS_COST < 2
+    fig, ax = bare_axes()
+    anchor = (50, 50)
+    x, y = ax.transData.transform(anchor)
+    top, bottom = slot_box(fig, ax, ABOVE, anchor), slot_box(fig, ax, BELOW, anchor)
+    marker = figures.Bbox([[x - 5, y - 5], [x + 5, y + 5]])
+    neighbour = figures.Bbox([[top.x0, top.y1 + 3], [top.x1, top.y1 + 10]])  # another row's mark, 3 px over the slot above
+    one, two = (marker, crossing(bottom)), (marker, crossing(bottom), crossing(bottom, 1))
+    assert not row_a_goes_above(fig, ax, anchor, one, [neighbour], figures.AMBIGUOUS_COST, monkeypatch)
+    assert row_a_goes_above(fig, ax, anchor, two, [neighbour], figures.AMBIGUOUS_COST, monkeypatch)
+    assert row_a_goes_above(fig, ax, anchor, one, [neighbour], 0, monkeypatch)
+
+
+def test_a_slot_that_touches_another_rows_mark_as_well_as_its_own_is_ambiguous(monkeypatch):
+    """At a distance of 0 from both, a slot is as near the neighbour as its own row: ambiguous. With the two overlaps it has,
+    that costs more than a slot below that three of the row's own marks cross, which is near no other row."""
+    fig, ax = bare_axes()
+    anchor = (50, 50)
+    x, y = ax.transData.transform(anchor)
+    top, bottom = slot_box(fig, ax, ABOVE, anchor), slot_box(fig, ax, BELOW, anchor)
+    marker = figures.Bbox([[x - 5, y - 5], [x + 5, y + 5]])
+    own_above = figures.Bbox([[top.x0 + 5, top.y0 - 3], [top.x0 + 9, top.y1 + 3]])  # the row's own mark across the slot above
+    neighbour = figures.Bbox([[top.x1 - 9, top.y0 - 3], [top.x1 - 5, top.y1 + 3]])  # and another row's mark across it too
+    own = (marker, own_above, crossing(bottom), crossing(bottom, 1), crossing(bottom, 2))
+    assert not row_a_goes_above(fig, ax, anchor, own, [neighbour], figures.AMBIGUOUS_COST, monkeypatch)
+    assert row_a_goes_above(fig, ax, anchor, own, [neighbour], 0, monkeypatch)  # it is the cost of ambiguity that decides
+
+
+def test_a_neighbours_label_beside_a_slot_does_not_make_it_ambiguous(monkeypatch):
+    """A reader attaches a label to the nearest mark, and a label is not a mark. The label of another row, placed first, that
+    stands 3 px from the slot above costs that slot nothing: the name takes it and not the slot below that its own bar crosses."""
+    fig, ax = bare_axes()
+    anchor = (50, 50)
+    x, y = ax.transData.transform(anchor)
+    top, bottom = slot_box(fig, ax, ABOVE, anchor), slot_box(fig, ax, BELOW, anchor)
+    marker = figures.Bbox([[x - 5, y - 5], [x + 5, y + 5]])
+    far = figures.Bbox([[10, 10], [20, 20]])  # the mark of the other row, far from both slots
+    beside = tuple(ax.transData.inverted().transform((top.x0 + 4, top.y1 + 3)))  # where its label's corner stands
+    neighbour = {"text": "row B", "middle": beside, "own": (far,), "slots": (("middle", 0, 0, "left", "bottom"),)}
+    assert row_a_goes_above(fig, ax, anchor, (marker, crossing(bottom)), [far], figures.AMBIGUOUS_COST, monkeypatch, before=[neighbour])
 
 
 @pytest.mark.parametrize("draw", ["plot_accuracy_vs_cost", "plot_latency"])
