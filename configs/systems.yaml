@@ -106,7 +106,9 @@ systems:
       rpm: 30
       rpd: 1000
       tpm: 8000
-      tpd: 200000
+      # No local tpd: Groq's own daily token count is lower than this runner's (on 2026-10-05 it
+      # allowed far more than 200,000 tokens as counted here, most likely because prompt-cached
+      # tokens do not count), so a local tpd only stopped runs early. Groq's 429 decides.
 
   groq-gpt-oss-120b-k10:
     endpoint: groq
@@ -126,7 +128,9 @@ systems:
       rpm: 30
       rpd: 1000
       tpm: 8000
-      tpd: 200000
+      # No local tpd: Groq's own daily token count is lower than this runner's (on 2026-10-05 it
+      # allowed far more than 200,000 tokens as counted here, most likely because prompt-cached
+      # tokens do not count), so a local tpd only stopped runs early. Groq's 429 decides.
 
   groq-qwen3.8-27b-k10:
     endpoint: groq
@@ -146,7 +150,9 @@ systems:
       rpm: 30
       rpd: 1000
       tpm: 8000
-      tpd: 200000
+      # No local tpd: Groq's own daily token count is lower than this runner's (on 2026-10-05 it
+      # allowed far more than 200,000 tokens as counted here, most likely because prompt-cached
+      # tokens do not count), so a local tpd only stopped runs early. Groq's 429 decides.
 
   gemini-3.5-flash-lite-k10:
     endpoint: gemini

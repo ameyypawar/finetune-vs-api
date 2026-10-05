@@ -190,7 +190,7 @@ def test_the_checkpoint_is_part_of_the_hash(env):
 
 def test_rate_limits_and_concurrency_are_not_part_of_the_hash(env):
     before = components(env)
-    edit(env, "systems.yaml", "      rpm: 30\n      rpd: 1000\n      tpm: 8000\n      tpd: 200000", "      rpm: 12\n      rpd: 100\n      tpm: 4000\n      tpd: 100000\n      max_concurrency: 1", entry=header(API))
+    edit(env, "systems.yaml", "      rpm: 30\n      rpd: 1000\n      tpm: 8000\n", "      rpm: 12\n      rpd: 100\n      tpm: 4000\n      tpd: 100000\n      max_concurrency: 1\n", entry=header(API))
     assert components(env) == before
 
 

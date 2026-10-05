@@ -53,7 +53,8 @@ def test_the_groq_rows_count_reasoning_against_the_token_budgets():
         assert row["supports_json_schema"] is True  # check_free_tiers, 2026-10-02: all three models accept the strict schema
         assert row["reasoning_in_completion"] is True  # completion_tokens, which the budgets use, include reasoning
         assert row["drop_params"] == []
-        assert {k: row["limits"][k] for k in ("rpm", "rpd", "tpm", "tpd")} == {"rpm": 30, "rpd": 1000, "tpm": 8000, "tpd": 200000}
+        assert {k: row["limits"][k] for k in ("rpm", "rpd", "tpm")} == {"rpm": 30, "rpd": 1000, "tpm": 8000}
+        assert "tpd" not in row["limits"]  # left to Groq's 429: its daily count is lower than this runner's (2026-10-05)
     for name, model in (("groq-gpt-oss-20b-k10", "openai/gpt-oss-20b"), ("groq-gpt-oss-120b-k10", "openai/gpt-oss-120b")):
         row = spec(name)  # the reasoning models: a low effort, and a budget for the reasoning as well as the JSON answer
         assert row["model"] == model
@@ -110,9 +111,13 @@ def test_every_api_row_has_a_price_entry():
 
 
 PUBLISHED_LIMIT_KEYS = {"rpm": "requests_per_minute", "rpd": "requests_per_day", "tpm": "tokens_per_minute", "tpd": "tokens_per_day"}
+#: Limits a row leaves to the server on purpose. Groq's daily token count is lower than this runner's: on
+#: 2026-10-05 it allowed far more than 200,000 tokens as counted here, most likely because prompt-cached tokens
+#: do not count. So the Groq rows carry no local tpd, though sources.yaml still records the published one.
+LEFT_TO_THE_SERVER = {"groq": {"tpd"}}
 
 
-def limit_mismatches(row, published):
+def limit_mismatches(row, published, skip=frozenset()):
     """(limit, the row's value, the published value) for each published limit that the row does not carry.
 
     A published value that is null is skipped: the Gemini limits are not transcribed yet, and its row holds
@@ -121,7 +126,7 @@ def limit_mismatches(row, published):
     return [
         (short, row["limits"].get(short), published[long])
         for short, long in PUBLISHED_LIMIT_KEYS.items()
-        if published.get(long) is not None and row["limits"].get(short) != published[long]
+        if short not in skip and published.get(long) is not None and row["limits"].get(short) != published[long]
     ]
 
 
@@ -130,7 +135,7 @@ def test_row_limits_match_the_published_limits_in_sources():
     for name in API_ROWS:
         row = spec(name)
         published = SOURCES["free_tier_limits"][row["endpoint"]]["models"][row["model"]]
-        assert limit_mismatches(row, published) == [], name
+        assert limit_mismatches(row, published, skip=LEFT_TO_THE_SERVER.get(row["endpoint"], frozenset())) == [], name
     for name in GROQ_ROWS:  # every Groq number is published, so every one of them was compared
         published = SOURCES["free_tier_limits"]["groq"]["models"][spec(name)["model"]]
         assert all(published[long] is not None for long in PUBLISHED_LIMIT_KEYS.values()), name
