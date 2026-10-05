@@ -1,0 +1,175 @@
+{
+  "system": "groq-gpt-oss-120b-k10",
+  "split": "test",
+  "subset": {
+    "name": "S500",
+    "n": 500,
+    "hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+  },
+  "status": "complete",
+  "stop": null,
+  "n_scored": 500,
+  "n_calls_failed": 1,
+  "limit": null,
+  "resumed": true,
+  "billing_basis": "free tier; priced at paid list price",
+  "prompt": {
+    "name": "fewshot_k10_v1",
+    "hash": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c"
+  },
+  "config_hash": "ed3ec3cefa0064eae5d9967fd6e4de042efa301f354543db02e3be12c0fb7704",
+  "config_components": {
+    "prompt": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c",
+    "schema": "5e2268508be3b063a5b20dee6acad733a618d30ca936e0198b6c4497080e6526",
+    "system": "9ae7cce40e9ebf07d1f0181272c00d7adcfffd9fbe2f8b4855607c8bb35a8422",
+    "decoding": "86737bd8ebd21913998467bbb8c9cceef173b84a4f995854141d0f3f70934303",
+    "checkpoint": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "prices": "7ece944d9f789e66d8f99ae7df0d9ab80e61968f86ee73fdfeca1b01df41407f",
+    "dataset": "006820b6b7e8c3b6cf36d8ebc4f6fbf4745ff0e02c4605a3cf5ffe7f4a91be29"
+  },
+  "git_commit": "4c771f453864cfce4d22d482c8e1ad606a4818ef",
+  "git_dirty": true,
+  "created_at": "2026-10-05T09:32:21Z",
+  "lock": {
+    "locked_at": "2026-10-02T06:05:16Z",
+    "reason": "Dev pilot on D50 passed (schema-valid 1.000, every answer finished normally, no errors). Prompt fewshot_k10_v1 and decoding frozen. No test request has been sent.",
+    "config_hash": "ed3ec3cefa0064eae5d9967fd6e4de042efa301f354543db02e3be12c0fb7704",
+    "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+  },
+  "endpoint": {
+    "name": "groq",
+    "base_url": "https://api.groq.com/openai/v1",
+    "model_requested": "openai/gpt-oss-120b",
+    "models_returned": {
+      "openai/gpt-oss-120b": 499
+    },
+    "tier": null
+  },
+  "decoding": {
+    "params": {
+      "temperature": 0,
+      "reasoning_effort": "low",
+      "max_completion_tokens": 1024
+    },
+    "drop_params": [],
+    "strict_json_schema_sent": true
+  },
+  "metrics": {
+    "n": 500,
+    "exact_match": {
+      "value": 0.63,
+      "ci95": [
+        0.588,
+        0.674
+      ]
+    },
+    "intent_accuracy": {
+      "value": 0.874,
+      "ci95": [
+        0.844,
+        0.902
+      ]
+    },
+    "slot_precision": {
+      "value": 0.6988416988416989,
+      "ci95": [
+        0.6563691569516813,
+        0.7406733692647871
+      ]
+    },
+    "slot_recall": {
+      "value": 0.7718550106609808,
+      "ci95": [
+        0.7317073170731707,
+        0.8106518759636799
+      ]
+    },
+    "slot_f1": {
+      "value": 0.7335359675785208,
+      "ci95": [
+        0.694129763130793,
+        0.7712822966507178
+      ]
+    },
+    "schema_valid_rate": {
+      "value": 0.998,
+      "ci95": [
+        0.994,
+        1.0
+      ]
+    },
+    "unfound_value_rate": {
+      "value": 0.005791505791505791,
+      "ci95": [
+        0.0,
+        0.013435700575815739
+      ]
+    },
+    "slot_counts": {
+      "tp": 362,
+      "fp": 156,
+      "fn": 107
+    },
+    "predicted_slots": 518
+  },
+  "latency_s": {
+    "p50": 0.5719324169913307,
+    "p95": 1.1181340410839766,
+    "n": 499,
+    "method": "nearest-rank",
+    "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+  },
+  "tokens": {
+    "calls_with_reported_usage": 499,
+    "calls_with_estimated_usage": 0,
+    "calls_without_usage": 0
+  },
+  "cost": {
+    "billing_basis": "free tier; priced at paid list price",
+    "calls": 499,
+    "calls_with_reported_usage": 499,
+    "calls_with_estimated_usage": 0,
+    "prompt_tokens": 743722,
+    "completion_tokens": 30248,
+    "reasoning_tokens": 15511,
+    "cacheable_prefix_tokens": 577,
+    "total_usd": {
+      "upper": 0.12970710000000016,
+      "lower": 0.10811287500000002
+    },
+    "per_1k_calls_usd": {
+      "upper": 0.25993406813627284,
+      "lower": 0.2166590681362726
+    },
+    "price": {
+      "id": "groq-gpt-oss-120b",
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "url": "https://console.groq.com/docs/model/openai/gpt-oss-120b",
+      "retrieved_on": "2026-10-01",
+      "usd_per_mtok": {
+        "input": 0.15,
+        "cached_input": 0.075,
+        "output": 0.6
+      }
+    }
+  },
+  "calls": {
+    "finish_reasons": {
+      "stop": 499
+    },
+    "errors_by_kind": {
+      "http_400": 1
+    },
+    "retries_total": 1,
+    "last_ratelimit_headers": {
+      "x-ratelimit-limit-requests": "1000",
+      "x-ratelimit-limit-tokens": "8000",
+      "x-ratelimit-remaining-requests": "992",
+      "x-ratelimit-remaining-tokens": "1810",
+      "x-ratelimit-reset-requests": "11m31.2s",
+      "x-ratelimit-reset-tokens": "46.425s"
+    }
+  },
+  "predictions": "results/runs/groq-gpt-oss-120b-k10__test/predictions.jsonl"
+}

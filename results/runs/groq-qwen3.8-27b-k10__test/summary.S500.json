@@ -1,0 +1,172 @@
+{
+  "system": "groq-qwen3.8-27b-k10",
+  "split": "test",
+  "subset": {
+    "name": "S500",
+    "n": 500,
+    "hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+  },
+  "status": "complete",
+  "stop": null,
+  "n_scored": 500,
+  "n_calls_failed": 0,
+  "limit": null,
+  "resumed": true,
+  "billing_basis": "free tier; priced at paid list price",
+  "prompt": {
+    "name": "fewshot_k10_v1",
+    "hash": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c"
+  },
+  "config_hash": "c4edf0b94c8a9a9bf1acb4aaa53366e500bb6ed14f465ce28e328026caee9339",
+  "config_components": {
+    "prompt": "2f87f299d959e973e98bfe43957ffa2f6a40753f64327c76c80dbd4cece4014c",
+    "schema": "5e2268508be3b063a5b20dee6acad733a618d30ca936e0198b6c4497080e6526",
+    "system": "7802af1cd894a2cbb2ad03abf49b9c943920f10e4125965544ae4c4051969a8f",
+    "decoding": "b3a69e5825b5f8ad5191404eafe87e161a5d2a0c6f9758a6a971936162a5ea1f",
+    "checkpoint": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "prices": "987093e3f47f7d1495c7fb95e329c81b11ef71f5ef81511cfca2f27d3bd43cd6",
+    "dataset": "006820b6b7e8c3b6cf36d8ebc4f6fbf4745ff0e02c4605a3cf5ffe7f4a91be29"
+  },
+  "git_commit": "4c771f453864cfce4d22d482c8e1ad606a4818ef",
+  "git_dirty": true,
+  "created_at": "2026-10-05T09:37:21Z",
+  "lock": {
+    "locked_at": "2026-10-02T06:05:16Z",
+    "reason": "Dev pilot on D50 passed (schema-valid 1.000, every answer finished normally, no errors). Prompt fewshot_k10_v1 and decoding frozen. No test request has been sent.",
+    "config_hash": "c4edf0b94c8a9a9bf1acb4aaa53366e500bb6ed14f465ce28e328026caee9339",
+    "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+  },
+  "endpoint": {
+    "name": "groq",
+    "base_url": "https://api.groq.com/openai/v1",
+    "model_requested": "qwen/qwen3.8-27b",
+    "models_returned": {
+      "qwen/qwen3.8-27b": 500
+    },
+    "tier": null
+  },
+  "decoding": {
+    "params": {
+      "temperature": 0,
+      "reasoning_effort": "none",
+      "max_completion_tokens": 256
+    },
+    "drop_params": [],
+    "strict_json_schema_sent": true
+  },
+  "metrics": {
+    "n": 500,
+    "exact_match": {
+      "value": 0.708,
+      "ci95": [
+        0.668,
+        0.748
+      ]
+    },
+    "intent_accuracy": {
+      "value": 0.896,
+      "ci95": [
+        0.868,
+        0.922
+      ]
+    },
+    "slot_precision": {
+      "value": 0.7543186180422264,
+      "ci95": [
+        0.7121212121212122,
+        0.7941761575802838
+      ]
+    },
+    "slot_recall": {
+      "value": 0.837953091684435,
+      "ci95": [
+        0.8008748049611328,
+        0.8742268041237113
+      ]
+    },
+    "slot_f1": {
+      "value": 0.7939393939393938,
+      "ci95": [
+        0.7566388670701845,
+        0.8296011246052327
+      ]
+    },
+    "schema_valid_rate": {
+      "value": 1.0,
+      "ci95": [
+        1.0,
+        1.0
+      ]
+    },
+    "unfound_value_rate": {
+      "value": 0.0019193857965451055,
+      "ci95": [
+        0.0,
+        0.005988023952095809
+      ]
+    },
+    "slot_counts": {
+      "tp": 393,
+      "fp": 128,
+      "fn": 76
+    },
+    "predicted_slots": 521
+  },
+  "latency_s": {
+    "p50": 0.23206275003030896,
+    "p95": 0.42981666699051857,
+    "n": 500,
+    "method": "nearest-rank",
+    "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+  },
+  "tokens": {
+    "calls_with_reported_usage": 500,
+    "calls_with_estimated_usage": 0,
+    "calls_without_usage": 0
+  },
+  "cost": {
+    "billing_basis": "free tier; priced at paid list price",
+    "calls": 500,
+    "calls_with_reported_usage": 500,
+    "calls_with_estimated_usage": 0,
+    "prompt_tokens": 491802,
+    "completion_tokens": 13648,
+    "reasoning_tokens": 0,
+    "cacheable_prefix_tokens": 577,
+    "total_usd": {
+      "upper": 0.44803360000000014,
+      "lower": 0.44803360000000014
+    },
+    "per_1k_calls_usd": {
+      "upper": 0.8960672000000003,
+      "lower": 0.8960672000000003
+    },
+    "price": {
+      "id": "groq-qwen3.8-27b",
+      "provider": "groq",
+      "model": "qwen/qwen3.8-27b",
+      "url": "https://console.groq.com/docs/model/qwen/qwen3.8-27b",
+      "retrieved_on": "2026-10-02",
+      "usd_per_mtok": {
+        "input": 0.8,
+        "output": 4.0
+      }
+    }
+  },
+  "calls": {
+    "finish_reasons": {
+      "stop": 500
+    },
+    "errors_by_kind": {},
+    "retries_total": 127,
+    "last_ratelimit_headers": {
+      "x-ratelimit-limit-requests": "1000",
+      "x-ratelimit-limit-tokens": "8000",
+      "x-ratelimit-remaining-requests": "959",
+      "x-ratelimit-remaining-tokens": "2817",
+      "x-ratelimit-reset-requests": "59m2.4s",
+      "x-ratelimit-reset-tokens": "43.448s"
+    }
+  },
+  "predictions": "results/runs/groq-qwen3.8-27b-k10__test/predictions.jsonl"
+}
