@@ -770,7 +770,7 @@ def test_an_unusable_benchmark_is_reported_not_guessed(tmp_path, monkeypatch, do
 
 #: What one GPU serves a month at 1 request/s: 3,600 seconds an hour, 730 hours a month.
 CALLS_PER_MONTH_AT_ONE_PER_S = 3600 * 730
-NO_OPERATING_POINT_NOTE = "No level met the p95 <= 1 s rule, so cost is reported at every measured level instead."
+NO_OPERATING_POINT_NOTE = "No level met the rule for an operating point (p95 latency at or under 1 s), so cost is reported at every measured level instead."
 BENCHMARK_REASON = NO_OPERATING_POINT_SERVING["operating_point_note"]  # what the benchmark itself says about the missing point
 
 

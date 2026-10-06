@@ -269,8 +269,8 @@ def section(text, heading):
 
 
 def readme_table():
-    """The "What will be compared" table of README.md: system name -> its cells."""
-    body = section((ROOT / "README.md").read_text(), "What will be compared")
+    """The "What is compared" table of README.md: system name -> its cells."""
+    body = section((ROOT / "README.md").read_text(), "What is compared")
     rows = [[cell.strip() for cell in line.strip().strip("|").split("|")] for line in body.splitlines() if line.startswith("| `")]
     return {row[0].strip("`"): row for row in rows}
 
@@ -282,7 +282,7 @@ def test_the_readme_table_lists_the_systems_and_where_each_runs():
     for name in API_ROWS:
         row = spec(name)
         assert table[name][1:] == [row["model"], f"`{row['prompt']}`", where[row["endpoint"]]], name
-    assert {table[name][3] for name in LOCAL_ROWS} == {"local server"}
+    assert {table[name][3] for name in LOCAL_ROWS} == {"self-hosted: vLLM on one T4"}
 
 
 def test_the_readme_example_command_runs_a_system_the_configs_define():

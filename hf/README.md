@@ -13,6 +13,45 @@ tags:
 - function-calling
 - intent-detection
 - slot-filling
+model-index:
+- name: "ft-qwen3-4b-lora"
+  results:
+  - task:
+      type: text-generation
+      name: Text generation
+    dataset:
+      name: "MASSIVE 1.1 en-US, test split (n=2974)"
+      type: "AmazonScience/massive"
+      config: "en-US"
+      split: test
+    metrics:
+    - type: "exact_match"
+      name: "Exact match"
+      value: 0.7327
+    - type: "accuracy"
+      name: "Intent accuracy"
+      value: 0.9001
+    - type: "f1"
+      name: "Slot F1"
+      value: 0.8257
+  - task:
+      type: text-generation
+      name: Text generation
+    dataset:
+      name: "MASSIVE 1.1 en-US, test subset S500 (n=500)"
+      type: "AmazonScience/massive"
+      config: "en-US"
+      split: test
+    metrics:
+    - type: "exact_match"
+      name: "Exact match"
+      value: 0.75
+    - type: "accuracy"
+      name: "Intent accuracy"
+      value: 0.91
+    - type: "f1"
+      name: "Slot F1"
+      value: 0.8401
 ---
 
 # ft-qwen3-4b-lora
@@ -25,8 +64,6 @@ A LoRA adapter for [Qwen/Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwe
 ```
 
 The adapter only works together with its base model. It is not a general chat model. It was compared with API models in the finetune-vs-api repository, whose `docs/method.md` defines every metric below.
-
-**Evaluation results are not in yet.** This card is generated from the repository's results directory, so the table and the metadata above fill in once the test runs have been compared.
 
 ## Use
 
@@ -104,13 +141,39 @@ Read from the training log (`results/train_log.json`, written by `kaggle/train_o
 
 ## Evaluation
 
-The evaluation compares this adapter with the untuned base model and with API models on a fixed test subset, using paired bootstrap intervals and an exact McNemar test. The table will appear here once the test runs exist.
+Each system is scored on a fixed, seeded test subset stratified by scenario: S500 (500 items), or a smaller nested one where the table says so. The self-hosted rows are also scored on the full test split. Intervals are 95% percentile bootstraps. The difference is the system minus the fine-tune, with a paired bootstrap interval and an exact McNemar test; a system "beats" another only when that interval excludes zero.
+
+| System | Items | Exact match | Difference from the fine-tune | McNemar p | Reading | Full test split |
+|---|---|---:|---:|---:|---|---:|
+| `ft-qwen3-4b-lora` | S500 (500) | 75.0% [71.2, 78.8] | reference | - | reference | 73.3% [71.7, 74.8] (n=2974) |
+| `base-qwen3-4b-k10` | S500 (500) | 66.6% [62.4, 70.8] | -8.4 pp [-12.4, -4.6] | <0.001 | the fine-tune beats it | 66.1% [64.4, 67.8] (n=2974) |
+| `groq-gpt-oss-20b-k10` | S500 (500) | 62.2% [57.8, 66.4] | -12.8 pp [-16.6, -9.0] | <0.001 | the fine-tune beats it | - |
+| `groq-gpt-oss-120b-k10` | S500 (500) | 63.0% [58.8, 67.4] | -12.0 pp [-16.0, -8.2] | <0.001 | the fine-tune beats it | - |
+| `groq-qwen3.8-27b-k10` | S500 (500) | 70.8% [66.8, 74.8] | -4.2 pp [-7.6, -0.6] | 0.024 | the fine-tune beats it | - |
+| `gemini-3.5-flash-lite-k10` | S500 (500) | 67.8% [63.6, 71.8] | -7.2 pp [-10.8, -3.6] | <0.001 | the fine-tune beats it | - |
+
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+
+The fine-tune's exact match has a 95% interval of plus or minus 3.8 pp on S500 and 1.6 pp on the full split.
+
+### Serving cost and latency
+
+Measured on the box, with no network in the path, at every load level fixed in advance. No level met the rule for an operating point (p95 latency at or under 1 s), so cost is reported at every measured level instead. Each cost is a GPU rented at that price and kept busy at that load, at the on-demand price and at the spot price; the calls one GPU serves a month are its throughput at that load over 730 hours.
+
+| Concurrency | Requests/s | p50 | p95 | Cost per 1,000 calls, on-demand | Cost per 1,000 calls, spot | Calls one GPU serves a month | APIs whose break-even range one GPU can serve |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 0.79 | 1.26 s | 2.27 s | $0.185 | $0.0963 | 2,076,901 | `groq-gpt-oss-120b-k10`, `groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10` |
+| 8 | 5.39 | 1.47 s | 2.57 s | $0.0271 | $0.0141 | 14,152,669 | `groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10`, `groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10` |
+| 32 | 14.40 | 2.16 s | 3.69 s | $0.0101 | $0.0053 | 37,837,287 | `groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10`, `groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10` |
+| 64 | 21.61 | 2.86 s | 4.67 s | $0.0068 | $0.0035 | 56,800,731 | `groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10`, `groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10` |
+
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
 
 ## Limitations
 
 - English only: the training and the evaluation use the `en-US` part of MASSIVE. Other languages, other domains and spoken input were not tested.
 - The labels are fixed: 60 intents and 55 slot types. A request outside them still gets one of them.
-- Slot values are meant to be copied from the request, but a model can emit a value that is not in it. Nothing constrains the decoding by default, so the output can fail to follow the JSON format; the schema-valid rate is reported next to the task metrics.
+- Slot values are meant to be copied from the request, but a model can emit a value that is not in it; the share of predicted slot values missing from the request is in `results/comparison.json`. Nothing constrains the decoding by default, so the output can fail to follow the JSON format; the schema-valid rate is reported next to the task metrics.
 - MASSIVE has been public since 2022, and an MTEB mirror of it redistributes the test text, so the base model may have seen the test items. The data also repeats: 21 test items have text that also occurs in train, which the evaluation reports separately.
 - The comparison covers one task, one run per system and subsets of the test split, so small differences are not resolved. `docs/method.md` has the details, including how throughput and cost were measured.
 

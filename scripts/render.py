@@ -150,6 +150,11 @@ def count(value: float) -> str:
     return f"{round(value):,}"
 
 
+def bounds_cell(low: str, high: str, *, same: str = "") -> str:
+    """A pair of bounds as "low to high", or the one value (followed by `same`) when both read alike."""
+    return f"{low}{same}" if low == high else f"{low} to {high}"
+
+
 def seconds(value: float) -> str:
     return f"{value:.2f} s"
 
@@ -255,8 +260,9 @@ def cost_table(doc: Mapping[str, Any], *, compact: bool = False) -> str | None:
             volumes = be.get(s["name"], {}).get("calls_per_month", {})
             volume_cell = "-"
             if volumes.get("cached_prefix") is not None and volumes.get("no_caching") is not None:
-                volume_cell = f"{count(volumes['cached_prefix'])} to {count(volumes['no_caching'])}"
-            rows.append([_code(s["name"]), "paid list price", f"{usd(bounds['lower'])} to {usd(bounds['upper'])}", volume_cell])
+                volume_cell = bounds_cell(count(volumes["cached_prefix"]), count(volumes["no_caching"]))
+            cost_cell = bounds_cell(usd(bounds["lower"]), usd(bounds["upper"]), same=" with or without caching")
+            rows.append([_code(s["name"]), "paid list price", cost_cell, volume_cell])
         else:
             rows.append([_code(s["name"]), "GPU rental at the on-demand price, kept busy", usd(c["per_1k_calls_usd"]), "-"])
     if not rows:

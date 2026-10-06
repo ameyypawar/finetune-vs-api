@@ -161,8 +161,8 @@ def priced_levels(system: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list
     return placed, unpriced
 
 
-def accuracy_points(doc: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[str], list[str]]:
-    """The systems that can be placed, those left out, and the load levels left out of a system that is placed.
+def accuracy_points(doc: Mapping[str, Any]) -> tuple[list[dict[str, Any]], dict[str, list[str]], list[str]]:
+    """The systems that can be placed, those left out (by why), and the load levels left out of a system that is placed.
 
     A system can be placed with an exact-match result and a positive cost. An API's cost is a range. A
     self-hosted system is one point for each of its measured load levels (`levels`, empty for an API), with
@@ -172,7 +172,7 @@ def accuracy_points(doc: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[
     single operating point, which is drawn as one point.
     """
     points: list[dict[str, Any]] = []
-    left_out: list[str] = []
+    left_out: dict[str, list[str]] = {}
     unpriced: list[str] = []
     headline = doc["subsets"]["headline"]
     for system in doc["systems"]:
@@ -191,7 +191,8 @@ def accuracy_points(doc: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[
         else:
             low = high = None
         if em is None or low is None or low <= 0:  # a log axis cannot show a cost of 0
-            left_out.append(system["name"])
+            why = "no result yet" if em is None else "no cost measured" if low is None else "a cost of 0 on a log axis"
+            left_out.setdefault(why, []).append(system["name"])
             continue
         if missing:
             unpriced.append(f"{system['name']} at concurrency {', '.join(str(c) for c in missing)}")
@@ -430,8 +431,8 @@ def plot_accuracy_vs_cost(doc: Mapping[str, Any]) -> Figure | None:
     note = f"Error bars: 95% bootstrap interval. API cost basis: {doc['billing_basis']} (no money was spent)."
     if chain:
         note += " The self-hosted row is one exact-match result shown at each measured load, so it has one bar."
-    if left_out:
-        note += f" Not shown, no result or no cost yet: {', '.join(left_out)}."
+    for why, names in left_out.items():
+        note += f" Not shown, {why}: {', '.join(names)}."
     if unpriced:
         note += f" Load levels not shown, no cost: {'; '.join(unpriced)}."
     _footer(fig, handles, note, legend_top=0.25)

@@ -15,15 +15,39 @@ The comparison has 6 systems:
 - `groq-qwen3.8-27b-k10`: qwen/qwen3.8-27b, prompt `fewshot_k10_v1` (10 retrieved examples), Groq, free tier.
 - `gemini-3.5-flash-lite-k10`: gemini-3.5-flash-lite, prompt `fewshot_k10_v1` (10 retrieved examples), Google AI Studio, free tier.
 
-The fine-tune is a LoRA adapter (rank 16, alpha 32, 2 epochs) fitted to the human-labelled train split only; no API output is a label. The API systems run on free tiers with daily request caps, so every system is scored on a fixed, seeded test subset, stratified by scenario: S500 (500 items), S300 (300 items, inside S500). Each system's configuration must be locked, with a reason, before the runner will touch the test split. No money is spent on the API systems: their costs are computed at paid list prices.
+The fine-tune is a LoRA adapter (rank 16, alpha 32, 2 epochs) fitted to the human-labelled train split only; no API output is a label. The API systems run on free tiers with daily request caps, so every system is scored on a fixed, seeded test subset, stratified by scenario: S500 (500 items), S300 (300 items, inside S500). Each system's configuration must be locked, with a reason, before the runner will touch the test split.
 
 ## Results
 
-No test run has been compared yet. Once the runs exist, `scripts/compare.py` writes the numbers and this section shows a table with each system's exact match and a 95% interval, the difference from the fine-tune with a paired interval, and a figure of exact match against cost per 1,000 calls on a logarithmic axis. Every system is scored on the same fixed subsets, so a difference is a difference on the same items, not on different samples. The wording rule is fixed in advance: a system beats another only where the interval of the paired difference excludes zero, and anything else is reported as no significant difference.
+| System | Exact match | Difference from the fine-tune | Reading |
+|---|---:|---:|---|
+| `ft-qwen3-4b-lora` | 75.0% [71.2, 78.8] | reference | reference |
+| `base-qwen3-4b-k10` | 66.6% [62.4, 70.8] | -8.4 pp [-12.4, -4.6] | the fine-tune beats it |
+| `groq-gpt-oss-20b-k10` | 62.2% [57.8, 66.4] | -12.8 pp [-16.6, -9.0] | the fine-tune beats it |
+| `groq-gpt-oss-120b-k10` | 63.0% [58.8, 67.4] | -12.0 pp [-16.0, -8.2] | the fine-tune beats it |
+| `groq-qwen3.8-27b-k10` | 70.8% [66.8, 74.8] | -4.2 pp [-7.6, -0.6] | the fine-tune beats it |
+| `gemini-3.5-flash-lite-k10` | 67.8% [63.6, 71.8] | -7.2 pp [-10.8, -3.6] | the fine-tune beats it |
+
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+
+![Exact match against cost per 1,000 calls](../results/figures/accuracy_vs_cost.png)
+
+A system beats another only where the interval of the paired difference excludes zero. On exact match, the fine-tune beats `base-qwen3-4b-k10`, `groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10`, `groq-qwen3.8-27b-k10` and `gemini-3.5-flash-lite-k10`. On the full test split the fine-tune scores 73.3% [71.7, 74.8] (2,974 items).
 
 ## Where the gap comes from
 
-Exact match needs the intent and every slot right. Once results exist, this section splits it into intent accuracy, slot F1, the schema-valid rate and the share of slot values that are not in the request, gives exact match without the test items whose text also occurs in train, and names the fine-tune's weakest scenario. The error analysis that follows is written by hand from sampled errors.
+Where each system loses points, by metric:
+
+- `ft-qwen3-4b-lora`: intent 91.0%, slot F1 84.0%, schema-valid 99.6%, values not in the request 0.2%.
+- `base-qwen3-4b-k10`: intent 87.2%, slot F1 76.8%, schema-valid 99.4%, values not in the request 0.4%.
+- `groq-gpt-oss-20b-k10`: intent 87.4%, slot F1 73.7%, schema-valid 100.0%, values not in the request 1.8%.
+- `groq-gpt-oss-120b-k10`: intent 87.4%, slot F1 73.4%, schema-valid 99.8%, values not in the request 0.6%.
+- `groq-qwen3.8-27b-k10`: intent 89.6%, slot F1 79.4%, schema-valid 100.0%, values not in the request 0.2%.
+- `gemini-3.5-flash-lite-k10`: intent 89.0%, slot F1 77.5%, schema-valid 100.0%, values not in the request 0.2%.
+
+Without the 2 S500 items whose text also occurs in train, the fine-tune scores 74.9% [71.1, 78.7] on 498 items.
+
+The fine-tune's weakest scenario on S500 is takeaway (50.0%, 10 items); cells this small are noisy.
 
 ### Error analysis
 
@@ -31,7 +55,25 @@ This is the slot for the hand-labelled error analysis: the errors go in `results
 
 ## Cost and break-even
 
-API costs are computed from tokens at the providers' paid list prices, as a no-caching bound and a bound with the static prompt prefix cached. Self-hosted cost comes from throughput measured on Kaggle's free T4 at every concurrency level of the sweep, priced at the on-demand and spot rates for renting the same GPU on AWS (g4dn.xlarge), and is reported at each level with its latency. The break-even is the monthly volume at which a GPU rented around the clock (730 hours at the on-demand price) costs less than each API, given that one GPU can serve that volume at that level. The self-hosted figures are the price with the GPU kept busy at that level; an idle or half-used GPU costs proportionally more. Self-hosted latency is measured on the box; API latency goes to the appendix.
+| System | Cost per 1,000 calls (cached prefix to no caching) | Break-even calls per month (same order) |
+|---|---:|---:|
+| `groq-gpt-oss-20b-k10` | $0.107 to $0.129 | 3,587,762 to 2,977,721 |
+| `groq-gpt-oss-120b-k10` | $0.217 to $0.260 | 1,772,278 to 1,477,221 |
+| `groq-qwen3.8-27b-k10` | $0.896 with or without caching | 428,517 |
+| `gemini-3.5-flash-lite-k10` | $0.200 to $0.356 | 1,916,313 to 1,078,098 |
+
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+
+A 1x NVIDIA T4 instance rented around the clock for 730 hours at the on-demand price ($0.526 an hour) costs $383.98 a month. Break-even is the monthly volume above which the rental costs less. No level met the rule for an operating point (p95 latency at or under 1 s), so cost is reported at every measured level instead. Self-hosted cost assumes a GPU kept busy; an idle one costs proportionally more.
+
+| Concurrency | p95 (s) | On-demand (spot) per 1,000 calls | Calls one GPU serves a month |
+|---:|---:|---:|---:|
+| 1 | 2.27 | $0.185 ($0.0963) | 2,076,901 |
+| 8 | 2.57 | $0.0271 ($0.0141) | 14,152,669 |
+| 32 | 3.69 | $0.0101 ($0.0053) | 37,837,287 |
+| 64 | 4.67 | $0.0068 ($0.0035) | 56,800,731 |
+
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
 
 ## Why now
 
@@ -46,10 +88,10 @@ An open-weights fine-tune that its owner serves does not depend on a provider's 
 
 ## Limits
 
-- The test subsets are samples: small differences are not resolved.
+- The test subsets are samples: small differences are not resolved (the fine-tune's exact match is plus or minus 3.8 pp on S500 and 1.6 pp on the full split; paired differences carry up to plus or minus 3.9 pp).
 - Each system runs once, at temperature 0, so run-to-run variance is not measured.
-- API rows run on free tiers and are priced at list prices, which can change; their latency, where shown, is observed on free tiers from India; not representative of paid tiers.
-- Self-hosted cost assumes the throughput measured on the benchmark GPU carries over to the rented GPU.
+- Prices are list prices, which can change.
+- Self-hosted cost assumes the throughput measured on Tesla T4 carries over to the rented 1x NVIDIA T4.
 - MASSIVE has been public since 2022 and an MTEB mirror redistributes its test text, so any model may have seen it; 21 test items also occur in train.
 
 ## Reproduce
@@ -68,4 +110,9 @@ Definitions are in `docs/method.md`.
 
 ## Appendix: API latency
 
-API latency will be listed here once the runs exist: observed on free tiers from India; not representative of paid tiers.
+Latency of the API systems, observed on free tiers from India; not representative of paid tiers:
+
+- `groq-gpt-oss-20b-k10`: p50 0.52 s, p95 1.08 s over 500 calls.
+- `groq-gpt-oss-120b-k10`: p50 0.57 s, p95 1.12 s over 499 calls.
+- `groq-qwen3.8-27b-k10`: p50 0.23 s, p95 0.43 s over 500 calls.
+- `gemini-3.5-flash-lite-k10`: p50 1.05 s, p95 1.55 s over 500 calls.

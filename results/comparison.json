@@ -1,0 +1,2034 @@
+{
+  "schema_version": 1,
+  "has_results": true,
+  "reference": "ft-qwen3-4b-lora",
+  "billing_basis": "free tier; priced at paid list price",
+  "bootstrap": {
+    "resamples": 10000,
+    "seed": 20261001,
+    "confidence": 0.95,
+    "interval": "percentile; the paired bootstrap resamples the same items for both systems"
+  },
+  "subsets": {
+    "headline": "S500",
+    "info": {
+      "full": {
+        "n": 2974,
+        "hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8"
+      },
+      "S500": {
+        "n": 500,
+        "hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+      }
+    }
+  },
+  "data": {
+    "audit": {
+      "path": "results/data_audit.json",
+      "overlap_key": "overlap.test_item_ids_in_train",
+      "normalization": "lowercase, trim, collapse whitespace",
+      "test_items_with_text_in_train": 21
+    }
+  },
+  "systems": [
+    {
+      "name": "ft-qwen3-4b-lora",
+      "kind": "self-hosted",
+      "endpoint": "local",
+      "model": "ft-qwen3-4b-lora",
+      "prompt": "finetuned_v1",
+      "tier": null,
+      "comparison_subset": "S500",
+      "status": "complete",
+      "n_subset": 500,
+      "n_scored": 500,
+      "n_calls_failed": 0,
+      "metrics": {
+        "n": 500,
+        "exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.712,
+            0.788
+          ]
+        },
+        "intent_accuracy": {
+          "value": 0.91,
+          "ci95": [
+            0.884,
+            0.934
+          ]
+        },
+        "slot_precision": {
+          "value": 0.8237704918032787,
+          "ci95": [
+            0.7863431416845514,
+            0.8591556481747629
+          ]
+        },
+        "slot_recall": {
+          "value": 0.8571428571428571,
+          "ci95": [
+            0.8226162999269546,
+            0.8907932262981214
+          ]
+        },
+        "slot_f1": {
+          "value": 0.8401253918495296,
+          "ci95": [
+            0.80665223234284,
+            0.871542438111088
+          ]
+        },
+        "schema_valid_rate": {
+          "value": 0.996,
+          "ci95": [
+            0.99,
+            1.0
+          ]
+        },
+        "unfound_value_rate": {
+          "value": 0.0020491803278688526,
+          "ci95": [
+            0.0,
+            0.006437768240343348
+          ]
+        },
+        "slot_counts": {
+          "tp": 402,
+          "fp": 86,
+          "fn": 67
+        },
+        "predicted_slots": 488
+      },
+      "unseen_text": {
+        "value": 0.748995983935743,
+        "ci95": [
+          0.7108433734939759,
+          0.7871485943775101
+        ],
+        "n": 498,
+        "excluded": 2
+      },
+      "per_scenario": {
+        "alarm": {
+          "n": 16,
+          "exact_match": 0.9375
+        },
+        "audio": {
+          "n": 10,
+          "exact_match": 0.8
+        },
+        "calendar": {
+          "n": 68,
+          "exact_match": 0.7352941176470589
+        },
+        "cooking": {
+          "n": 12,
+          "exact_match": 0.5833333333333334
+        },
+        "datetime": {
+          "n": 17,
+          "exact_match": 0.7647058823529411
+        },
+        "email": {
+          "n": 45,
+          "exact_match": 0.8
+        },
+        "general": {
+          "n": 32,
+          "exact_match": 0.59375
+        },
+        "iot": {
+          "n": 37,
+          "exact_match": 0.8648648648648649
+        },
+        "lists": {
+          "n": 24,
+          "exact_match": 0.875
+        },
+        "music": {
+          "n": 14,
+          "exact_match": 0.8571428571428571
+        },
+        "news": {
+          "n": 21,
+          "exact_match": 0.7619047619047619
+        },
+        "play": {
+          "n": 65,
+          "exact_match": 0.5538461538461539
+        },
+        "qa": {
+          "n": 48,
+          "exact_match": 0.8958333333333334
+        },
+        "recommendation": {
+          "n": 16,
+          "exact_match": 0.5625
+        },
+        "social": {
+          "n": 18,
+          "exact_match": 0.7222222222222222
+        },
+        "takeaway": {
+          "n": 10,
+          "exact_match": 0.5
+        },
+        "transport": {
+          "n": 21,
+          "exact_match": 0.7619047619047619
+        },
+        "weather": {
+          "n": 26,
+          "exact_match": 0.9230769230769231
+        }
+      },
+      "vs_reference": null,
+      "full_test": {
+        "n_expected": 2974,
+        "n_scored": 2974,
+        "complete": true,
+        "metrics": {
+          "n": 2974,
+          "exact_match": {
+            "value": 0.7326832548755884,
+            "ci95": [
+              0.7168796234028245,
+              0.7484868863483524
+            ]
+          },
+          "intent_accuracy": {
+            "value": 0.9001344989912575,
+            "ci95": [
+              0.8893745796906524,
+              0.9105581708137189
+            ]
+          },
+          "slot_precision": {
+            "value": 0.8146611341632088,
+            "ci95": [
+              0.7996514913994232,
+              0.8297357192420204
+            ]
+          },
+          "slot_recall": {
+            "value": 0.8369449378330373,
+            "ci95": [
+              0.8221666031203424,
+              0.8512876731231135
+            ]
+          },
+          "slot_f1": {
+            "value": 0.8256527072016822,
+            "ci95": [
+              0.8120013178778791,
+              0.8387331195546097
+            ]
+          },
+          "schema_valid_rate": {
+            "value": 0.9966375252185609,
+            "ci95": [
+              0.9942837928715534,
+              0.9986550100874243
+            ]
+          },
+          "unfound_value_rate": {
+            "value": 0.0006915629322268327,
+            "ci95": [
+              0.0,
+              0.0017421602787456446
+            ]
+          },
+          "slot_counts": {
+            "tp": 2356,
+            "fp": 536,
+            "fn": 459
+          },
+          "predicted_slots": 2892
+        },
+        "unseen_text": {
+          "value": 0.7311208940060955,
+          "ci95": [
+            0.7152048763968846,
+            0.7470369116153065
+          ],
+          "n": 2953,
+          "excluded": 21
+        }
+      },
+      "model_names": {
+        "requested": "ft-qwen3-4b-lora",
+        "returned": [
+          "ft-qwen3-4b-lora"
+        ],
+        "changed": false,
+        "segments": [
+          {
+            "model": "ft-qwen3-4b-lora",
+            "rows": 2974,
+            "first_row": 1,
+            "last_row": 2974
+          }
+        ],
+        "answers_without_a_name": 0
+      },
+      "cost": null,
+      "cost_by_load": {
+        "basis": "aws-g4dn.xlarge rented at the on-demand and at the spot price, kept busy at each measured concurrency level",
+        "usd_per_hour": {
+          "on_demand": 0.526,
+          "spot": 0.274
+        },
+        "operating_point": null,
+        "note": "No level met the rule for an operating point (p95 latency at or under 1 s), so cost is reported at every measured level instead.",
+        "levels": [
+          {
+            "concurrency": 1,
+            "requests_per_s": 0.7902971279704475,
+            "p50_s": 1.263791477000268,
+            "p95_s": 2.265675778000059,
+            "per_1k_calls_usd": {
+              "on_demand": 0.18488123762557165,
+              "spot": 0.09630695648176167
+            },
+            "capacity_calls_per_month": 2076900.852306336
+          },
+          {
+            "concurrency": 8,
+            "requests_per_s": 5.385338207373253,
+            "p50_s": 1.4740067720003935,
+            "p95_s": 2.5726369000003615,
+            "per_1k_calls_usd": {
+              "on_demand": 0.02713127857245165,
+              "spot": 0.01413302343888166
+            },
+            "capacity_calls_per_month": 14152668.80897691
+          },
+          {
+            "concurrency": 32,
+            "requests_per_s": 14.397749937930618,
+            "p50_s": 2.1623028639996846,
+            "p95_s": 3.694262458000594,
+            "per_1k_calls_usd": {
+              "on_demand": 0.010148190636801101,
+              "spot": 0.005286319837421106
+            },
+            "capacity_calls_per_month": 37837286.83688166
+          },
+          {
+            "concurrency": 64,
+            "requests_per_s": 21.613672298010005,
+            "p50_s": 2.864285048999591,
+            "p95_s": 4.674049363999984,
+            "per_1k_calls_usd": {
+              "on_demand": 0.0067601242906122775,
+              "spot": 0.0035214335658322513
+            },
+            "capacity_calls_per_month": 56800730.79917029
+          }
+        ]
+      },
+      "latency_observed": null,
+      "run": {
+        "summary": "results/runs/ft-qwen3-4b-lora__test/summary.full.json",
+        "predictions": "results/runs/ft-qwen3-4b-lora__test/predictions.jsonl",
+        "summary_is_partial": false,
+        "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+        "git_commit": null,
+        "git_dirty": null,
+        "created_at": "2026-10-02T12:11:20Z",
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Epoch 2 chosen on the full dev split by the rule fixed in advance (results/serving/dev_select.json): exact match 0.730, epoch 1 0.707. Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "e336e00c2a3164465ff82c933d4a994566e6a8cfff359038fca9c33dbcf7a245",
+          "subset_hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8"
+        },
+        "subset": {
+          "name": "full",
+          "n": 2974,
+          "hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8"
+        }
+      }
+    },
+    {
+      "name": "base-qwen3-4b-k10",
+      "kind": "self-hosted",
+      "endpoint": "local",
+      "model": "Qwen/Qwen3-4B-Instruct-2507",
+      "prompt": "fewshot_k10_v1",
+      "tier": null,
+      "comparison_subset": "S500",
+      "status": "complete",
+      "n_subset": 500,
+      "n_scored": 500,
+      "n_calls_failed": 0,
+      "metrics": {
+        "n": 500,
+        "exact_match": {
+          "value": 0.666,
+          "ci95": [
+            0.624,
+            0.708
+          ]
+        },
+        "intent_accuracy": {
+          "value": 0.872,
+          "ci95": [
+            0.842,
+            0.9
+          ]
+        },
+        "slot_precision": {
+          "value": 0.7372549019607844,
+          "ci95": [
+            0.6951450390717498,
+            0.776699492329356
+          ]
+        },
+        "slot_recall": {
+          "value": 0.8017057569296375,
+          "ci95": [
+            0.7621052631578947,
+            0.8407263966533202
+          ]
+        },
+        "slot_f1": {
+          "value": 0.7681307456588357,
+          "ci95": [
+            0.7302904564315353,
+            0.8040619549655084
+          ]
+        },
+        "schema_valid_rate": {
+          "value": 0.994,
+          "ci95": [
+            0.986,
+            1.0
+          ]
+        },
+        "unfound_value_rate": {
+          "value": 0.00392156862745098,
+          "ci95": [
+            0.0,
+            0.010121457489878543
+          ]
+        },
+        "slot_counts": {
+          "tp": 376,
+          "fp": 134,
+          "fn": 93
+        },
+        "predicted_slots": 510
+      },
+      "unseen_text": {
+        "value": 0.6646586345381527,
+        "ci95": [
+          0.6224899598393574,
+          0.7048192771084337
+        ],
+        "n": 498,
+        "excluded": 2
+      },
+      "per_scenario": {
+        "alarm": {
+          "n": 16,
+          "exact_match": 0.875
+        },
+        "audio": {
+          "n": 10,
+          "exact_match": 0.8
+        },
+        "calendar": {
+          "n": 68,
+          "exact_match": 0.6176470588235294
+        },
+        "cooking": {
+          "n": 12,
+          "exact_match": 0.6666666666666666
+        },
+        "datetime": {
+          "n": 17,
+          "exact_match": 0.6470588235294118
+        },
+        "email": {
+          "n": 45,
+          "exact_match": 0.6666666666666666
+        },
+        "general": {
+          "n": 32,
+          "exact_match": 0.34375
+        },
+        "iot": {
+          "n": 37,
+          "exact_match": 0.8108108108108109
+        },
+        "lists": {
+          "n": 24,
+          "exact_match": 0.875
+        },
+        "music": {
+          "n": 14,
+          "exact_match": 0.7857142857142857
+        },
+        "news": {
+          "n": 21,
+          "exact_match": 0.6666666666666666
+        },
+        "play": {
+          "n": 65,
+          "exact_match": 0.5384615384615384
+        },
+        "qa": {
+          "n": 48,
+          "exact_match": 0.7708333333333334
+        },
+        "recommendation": {
+          "n": 16,
+          "exact_match": 0.5
+        },
+        "social": {
+          "n": 18,
+          "exact_match": 0.6666666666666666
+        },
+        "takeaway": {
+          "n": 10,
+          "exact_match": 0.4
+        },
+        "transport": {
+          "n": 21,
+          "exact_match": 0.7142857142857143
+        },
+        "weather": {
+          "n": 26,
+          "exact_match": 0.8461538461538461
+        }
+      },
+      "vs_reference": {
+        "reference": "ft-qwen3-4b-lora",
+        "subset": "S500",
+        "n": 500,
+        "complete": true,
+        "system_exact_match": {
+          "value": 0.666,
+          "ci95": [
+            0.624,
+            0.708
+          ]
+        },
+        "reference_exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.712,
+            0.788
+          ]
+        },
+        "difference": {
+          "value": -0.08399999999999996,
+          "ci95": [
+            -0.124,
+            -0.04599999999999993
+          ],
+          "direction": "system minus reference",
+          "bootstrap_p": 0.00019998000199980003
+        },
+        "mcnemar": {
+          "system_only": 28,
+          "reference_only": 70,
+          "p_value": 2.6402449757572133e-05
+        },
+        "verdict": {
+          "relation": "reference_beats_system",
+          "text": "ft-qwen3-4b-lora beats base-qwen3-4b-k10"
+        }
+      },
+      "full_test": {
+        "n_expected": 2974,
+        "n_scored": 2974,
+        "complete": true,
+        "metrics": {
+          "n": 2974,
+          "exact_match": {
+            "value": 0.6607262945527909,
+            "ci95": [
+              0.6439139206455952,
+              0.6775386684599866
+            ]
+          },
+          "intent_accuracy": {
+            "value": 0.8796234028244788,
+            "ci95": [
+              0.8678547410894418,
+              0.8913920645595158
+            ]
+          },
+          "slot_precision": {
+            "value": 0.7357142857142858,
+            "ci95": [
+              0.7189113838165393,
+              0.7520522658377192
+            ]
+          },
+          "slot_recall": {
+            "value": 0.7683836589698047,
+            "ci95": [
+              0.7514574099664639,
+              0.7849044934779765
+            ]
+          },
+          "slot_f1": {
+            "value": 0.7516941789748046,
+            "ci95": [
+              0.7360842844600527,
+              0.7665868632823921
+            ]
+          },
+          "schema_valid_rate": {
+            "value": 0.991930060524546,
+            "ci95": [
+              0.9885675857431069,
+              0.9949562878278413
+            ]
+          },
+          "unfound_value_rate": {
+            "value": 0.00510204081632653,
+            "ci95": [
+              0.002455235819753445,
+              0.007964158542408213
+            ]
+          },
+          "slot_counts": {
+            "tp": 2163,
+            "fp": 777,
+            "fn": 652
+          },
+          "predicted_slots": 2940
+        },
+        "unseen_text": {
+          "value": 0.6586522180833051,
+          "ci95": [
+            0.6413816457839485,
+            0.6759227903826617
+          ],
+          "n": 2953,
+          "excluded": 21
+        }
+      },
+      "model_names": {
+        "requested": "Qwen/Qwen3-4B-Instruct-2507",
+        "returned": [
+          "Qwen/Qwen3-4B-Instruct-2507"
+        ],
+        "changed": false,
+        "segments": [
+          {
+            "model": "Qwen/Qwen3-4B-Instruct-2507",
+            "rows": 2974,
+            "first_row": 1,
+            "last_row": 2974
+          }
+        ],
+        "answers_without_a_name": 0
+      },
+      "cost": null,
+      "cost_by_load": null,
+      "latency_observed": null,
+      "run": {
+        "summary": "results/runs/base-qwen3-4b-k10__test/summary.full.json",
+        "predictions": "results/runs/base-qwen3-4b-k10__test/predictions.jsonl",
+        "summary_is_partial": false,
+        "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+        "git_commit": null,
+        "git_dirty": null,
+        "created_at": "2026-10-02T12:01:46Z",
+        "lock": {
+          "locked_at": "2026-10-02T11:27:23Z",
+          "reason": "Base row frozen with the dev selection (exact match 0.666 on the full dev split, ten retrieved examples). Served by vllm-lora-triton. No test request has been sent.",
+          "config_hash": "7e9b9d84bbeac514ef3a5b4d5c85b2c8e2c8a3e8c99498a8a9217a5fb99d290a",
+          "subset_hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8"
+        },
+        "subset": {
+          "name": "full",
+          "n": 2974,
+          "hash": "1c7b119eeff59c2c68642872c4b84f68948f3cc27e40ea9b8c858c17674456f8"
+        }
+      }
+    },
+    {
+      "name": "groq-gpt-oss-20b-k10",
+      "kind": "api",
+      "endpoint": "groq",
+      "model": "openai/gpt-oss-20b",
+      "prompt": "fewshot_k10_v1",
+      "tier": null,
+      "comparison_subset": "S500",
+      "status": "complete",
+      "n_subset": 500,
+      "n_scored": 500,
+      "n_calls_failed": 0,
+      "metrics": {
+        "n": 500,
+        "exact_match": {
+          "value": 0.622,
+          "ci95": [
+            0.578,
+            0.664
+          ]
+        },
+        "intent_accuracy": {
+          "value": 0.874,
+          "ci95": [
+            0.844,
+            0.902
+          ]
+        },
+        "slot_precision": {
+          "value": 0.7064579256360078,
+          "ci95": [
+            0.6625245777829863,
+            0.7490423276954679
+          ]
+        },
+        "slot_recall": {
+          "value": 0.7697228144989339,
+          "ci95": [
+            0.7276640611199435,
+            0.8099368250539957
+          ]
+        },
+        "slot_f1": {
+          "value": 0.7367346938775511,
+          "ci95": [
+            0.696969696969697,
+            0.7748693628752813
+          ]
+        },
+        "schema_valid_rate": {
+          "value": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "unfound_value_rate": {
+          "value": 0.01761252446183953,
+          "ci95": [
+            0.005952380952380952,
+            0.0313740899110135
+          ]
+        },
+        "slot_counts": {
+          "tp": 361,
+          "fp": 150,
+          "fn": 108
+        },
+        "predicted_slots": 511
+      },
+      "unseen_text": {
+        "value": 0.6204819277108434,
+        "ci95": [
+          0.5763052208835341,
+          0.6626506024096386
+        ],
+        "n": 498,
+        "excluded": 2
+      },
+      "per_scenario": {
+        "alarm": {
+          "n": 16,
+          "exact_match": 0.9375
+        },
+        "audio": {
+          "n": 10,
+          "exact_match": 0.8
+        },
+        "calendar": {
+          "n": 68,
+          "exact_match": 0.5441176470588235
+        },
+        "cooking": {
+          "n": 12,
+          "exact_match": 0.75
+        },
+        "datetime": {
+          "n": 17,
+          "exact_match": 0.5294117647058824
+        },
+        "email": {
+          "n": 45,
+          "exact_match": 0.6222222222222222
+        },
+        "general": {
+          "n": 32,
+          "exact_match": 0.40625
+        },
+        "iot": {
+          "n": 37,
+          "exact_match": 0.7837837837837838
+        },
+        "lists": {
+          "n": 24,
+          "exact_match": 0.7916666666666666
+        },
+        "music": {
+          "n": 14,
+          "exact_match": 0.6428571428571429
+        },
+        "news": {
+          "n": 21,
+          "exact_match": 0.6190476190476191
+        },
+        "play": {
+          "n": 65,
+          "exact_match": 0.4153846153846154
+        },
+        "qa": {
+          "n": 48,
+          "exact_match": 0.7916666666666666
+        },
+        "recommendation": {
+          "n": 16,
+          "exact_match": 0.5
+        },
+        "social": {
+          "n": 18,
+          "exact_match": 0.5555555555555556
+        },
+        "takeaway": {
+          "n": 10,
+          "exact_match": 0.4
+        },
+        "transport": {
+          "n": 21,
+          "exact_match": 0.7142857142857143
+        },
+        "weather": {
+          "n": 26,
+          "exact_match": 0.7692307692307693
+        }
+      },
+      "vs_reference": {
+        "reference": "ft-qwen3-4b-lora",
+        "subset": "S500",
+        "n": 500,
+        "complete": true,
+        "system_exact_match": {
+          "value": 0.622,
+          "ci95": [
+            0.578,
+            0.664
+          ]
+        },
+        "reference_exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.712,
+            0.788
+          ]
+        },
+        "difference": {
+          "value": -0.128,
+          "ci95": [
+            -0.16600000000000004,
+            -0.08999999999999997
+          ],
+          "direction": "system minus reference",
+          "bootstrap_p": 0.00019998000199980003
+        },
+        "mcnemar": {
+          "system_only": 20,
+          "reference_only": 84,
+          "p_value": 1.638050151166579e-10
+        },
+        "verdict": {
+          "relation": "reference_beats_system",
+          "text": "ft-qwen3-4b-lora beats groq-gpt-oss-20b-k10"
+        }
+      },
+      "full_test": null,
+      "model_names": {
+        "requested": "openai/gpt-oss-20b",
+        "returned": [
+          "openai/gpt-oss-20b"
+        ],
+        "changed": false,
+        "segments": [
+          {
+            "model": "openai/gpt-oss-20b",
+            "rows": 500,
+            "first_row": 1,
+            "last_row": 500
+          }
+        ],
+        "answers_without_a_name": 0
+      },
+      "cost": {
+        "billing_basis": "free tier; priced at paid list price",
+        "calls": 500,
+        "prompt_tokens": 745145,
+        "completion_tokens": 28632,
+        "reasoning_tokens": 13930,
+        "cacheable_prefix_tokens": 577,
+        "per_1k_calls_usd": {
+          "upper": 0.12895094999999993,
+          "lower": 0.10702495000000002
+        },
+        "price": {
+          "id": "groq-gpt-oss-20b",
+          "provider": "groq",
+          "model": "openai/gpt-oss-20b",
+          "url": "https://console.groq.com/docs/model/openai/gpt-oss-20b",
+          "retrieved_on": "2026-10-02",
+          "usd_per_mtok": {
+            "input": 0.075,
+            "cached_input": 0.037,
+            "output": 0.3
+          }
+        }
+      },
+      "cost_by_load": null,
+      "latency_observed": {
+        "p50": 0.518688292009756,
+        "p95": 1.0783252919791266,
+        "n": 500,
+        "method": "nearest-rank",
+        "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+      },
+      "run": {
+        "summary": "results/runs/groq-gpt-oss-20b-k10__test/summary.S500.json",
+        "predictions": "results/runs/groq-gpt-oss-20b-k10__test/predictions.jsonl",
+        "summary_is_partial": false,
+        "config_hash": "2ddac38db7c311e76db95405d49c424d9391e343aeeff1b88a96989e06e124ae",
+        "git_commit": "0461175734d93c67f09c66c5dfd0a46a9e1a2c16",
+        "git_dirty": true,
+        "created_at": "2026-10-06T06:30:52Z",
+        "lock": {
+          "locked_at": "2026-10-02T06:05:16Z",
+          "reason": "Dev pilot on D50 passed (schema-valid 1.000, every answer finished normally, no errors). Prompt fewshot_k10_v1 and decoding frozen. No test request has been sent.",
+          "config_hash": "2ddac38db7c311e76db95405d49c424d9391e343aeeff1b88a96989e06e124ae",
+          "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        },
+        "subset": {
+          "name": "S500",
+          "n": 500,
+          "hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        }
+      }
+    },
+    {
+      "name": "groq-gpt-oss-120b-k10",
+      "kind": "api",
+      "endpoint": "groq",
+      "model": "openai/gpt-oss-120b",
+      "prompt": "fewshot_k10_v1",
+      "tier": null,
+      "comparison_subset": "S500",
+      "status": "complete",
+      "n_subset": 500,
+      "n_scored": 500,
+      "n_calls_failed": 1,
+      "metrics": {
+        "n": 500,
+        "exact_match": {
+          "value": 0.63,
+          "ci95": [
+            0.588,
+            0.674
+          ]
+        },
+        "intent_accuracy": {
+          "value": 0.874,
+          "ci95": [
+            0.844,
+            0.902
+          ]
+        },
+        "slot_precision": {
+          "value": 0.6988416988416989,
+          "ci95": [
+            0.6563691569516813,
+            0.7406733692647871
+          ]
+        },
+        "slot_recall": {
+          "value": 0.7718550106609808,
+          "ci95": [
+            0.7317073170731707,
+            0.8106518759636799
+          ]
+        },
+        "slot_f1": {
+          "value": 0.7335359675785208,
+          "ci95": [
+            0.694129763130793,
+            0.7712822966507178
+          ]
+        },
+        "schema_valid_rate": {
+          "value": 0.998,
+          "ci95": [
+            0.994,
+            1.0
+          ]
+        },
+        "unfound_value_rate": {
+          "value": 0.005791505791505791,
+          "ci95": [
+            0.0,
+            0.013435700575815739
+          ]
+        },
+        "slot_counts": {
+          "tp": 362,
+          "fp": 156,
+          "fn": 107
+        },
+        "predicted_slots": 518
+      },
+      "unseen_text": {
+        "value": 0.6285140562248996,
+        "ci95": [
+          0.5863453815261044,
+          0.6686746987951807
+        ],
+        "n": 498,
+        "excluded": 2
+      },
+      "per_scenario": {
+        "alarm": {
+          "n": 16,
+          "exact_match": 0.9375
+        },
+        "audio": {
+          "n": 10,
+          "exact_match": 0.8
+        },
+        "calendar": {
+          "n": 68,
+          "exact_match": 0.5588235294117647
+        },
+        "cooking": {
+          "n": 12,
+          "exact_match": 0.4166666666666667
+        },
+        "datetime": {
+          "n": 17,
+          "exact_match": 0.4117647058823529
+        },
+        "email": {
+          "n": 45,
+          "exact_match": 0.6888888888888889
+        },
+        "general": {
+          "n": 32,
+          "exact_match": 0.28125
+        },
+        "iot": {
+          "n": 37,
+          "exact_match": 0.8108108108108109
+        },
+        "lists": {
+          "n": 24,
+          "exact_match": 0.9166666666666666
+        },
+        "music": {
+          "n": 14,
+          "exact_match": 0.7857142857142857
+        },
+        "news": {
+          "n": 21,
+          "exact_match": 0.5714285714285714
+        },
+        "play": {
+          "n": 65,
+          "exact_match": 0.46153846153846156
+        },
+        "qa": {
+          "n": 48,
+          "exact_match": 0.7916666666666666
+        },
+        "recommendation": {
+          "n": 16,
+          "exact_match": 0.4375
+        },
+        "social": {
+          "n": 18,
+          "exact_match": 0.7222222222222222
+        },
+        "takeaway": {
+          "n": 10,
+          "exact_match": 0.5
+        },
+        "transport": {
+          "n": 21,
+          "exact_match": 0.6666666666666666
+        },
+        "weather": {
+          "n": 26,
+          "exact_match": 0.7692307692307693
+        }
+      },
+      "vs_reference": {
+        "reference": "ft-qwen3-4b-lora",
+        "subset": "S500",
+        "n": 500,
+        "complete": true,
+        "system_exact_match": {
+          "value": 0.63,
+          "ci95": [
+            0.588,
+            0.674
+          ]
+        },
+        "reference_exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.712,
+            0.788
+          ]
+        },
+        "difference": {
+          "value": -0.12,
+          "ci95": [
+            -0.16000000000000003,
+            -0.08199999999999996
+          ],
+          "direction": "system minus reference",
+          "bootstrap_p": 0.00019998000199980003
+        },
+        "mcnemar": {
+          "system_only": 21,
+          "reference_only": 81,
+          "p_value": 1.709865174269227e-09
+        },
+        "verdict": {
+          "relation": "reference_beats_system",
+          "text": "ft-qwen3-4b-lora beats groq-gpt-oss-120b-k10"
+        }
+      },
+      "full_test": null,
+      "model_names": {
+        "requested": "openai/gpt-oss-120b",
+        "returned": [
+          "openai/gpt-oss-120b"
+        ],
+        "changed": false,
+        "segments": [
+          {
+            "model": "openai/gpt-oss-120b",
+            "rows": 499,
+            "first_row": 1,
+            "last_row": 499
+          }
+        ],
+        "answers_without_a_name": 0
+      },
+      "cost": {
+        "billing_basis": "free tier; priced at paid list price",
+        "calls": 499,
+        "prompt_tokens": 743722,
+        "completion_tokens": 30248,
+        "reasoning_tokens": 15511,
+        "cacheable_prefix_tokens": 577,
+        "per_1k_calls_usd": {
+          "upper": 0.25993406813627284,
+          "lower": 0.2166590681362726
+        },
+        "price": {
+          "id": "groq-gpt-oss-120b",
+          "provider": "groq",
+          "model": "openai/gpt-oss-120b",
+          "url": "https://console.groq.com/docs/model/openai/gpt-oss-120b",
+          "retrieved_on": "2026-10-01",
+          "usd_per_mtok": {
+            "input": 0.15,
+            "cached_input": 0.075,
+            "output": 0.6
+          }
+        }
+      },
+      "cost_by_load": null,
+      "latency_observed": {
+        "p50": 0.5719324169913307,
+        "p95": 1.1181340410839766,
+        "n": 499,
+        "method": "nearest-rank",
+        "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+      },
+      "run": {
+        "summary": "results/runs/groq-gpt-oss-120b-k10__test/summary.S500.json",
+        "predictions": "results/runs/groq-gpt-oss-120b-k10__test/predictions.jsonl",
+        "summary_is_partial": false,
+        "config_hash": "ed3ec3cefa0064eae5d9967fd6e4de042efa301f354543db02e3be12c0fb7704",
+        "git_commit": "4c771f453864cfce4d22d482c8e1ad606a4818ef",
+        "git_dirty": true,
+        "created_at": "2026-10-05T09:32:21Z",
+        "lock": {
+          "locked_at": "2026-10-02T06:05:16Z",
+          "reason": "Dev pilot on D50 passed (schema-valid 1.000, every answer finished normally, no errors). Prompt fewshot_k10_v1 and decoding frozen. No test request has been sent.",
+          "config_hash": "ed3ec3cefa0064eae5d9967fd6e4de042efa301f354543db02e3be12c0fb7704",
+          "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        },
+        "subset": {
+          "name": "S500",
+          "n": 500,
+          "hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        }
+      }
+    },
+    {
+      "name": "groq-qwen3.8-27b-k10",
+      "kind": "api",
+      "endpoint": "groq",
+      "model": "qwen/qwen3.8-27b",
+      "prompt": "fewshot_k10_v1",
+      "tier": null,
+      "comparison_subset": "S500",
+      "status": "complete",
+      "n_subset": 500,
+      "n_scored": 500,
+      "n_calls_failed": 0,
+      "metrics": {
+        "n": 500,
+        "exact_match": {
+          "value": 0.708,
+          "ci95": [
+            0.668,
+            0.748
+          ]
+        },
+        "intent_accuracy": {
+          "value": 0.896,
+          "ci95": [
+            0.868,
+            0.922
+          ]
+        },
+        "slot_precision": {
+          "value": 0.7543186180422264,
+          "ci95": [
+            0.7121212121212122,
+            0.7941761575802838
+          ]
+        },
+        "slot_recall": {
+          "value": 0.837953091684435,
+          "ci95": [
+            0.8008748049611328,
+            0.8742268041237113
+          ]
+        },
+        "slot_f1": {
+          "value": 0.7939393939393938,
+          "ci95": [
+            0.7566388670701845,
+            0.8296011246052327
+          ]
+        },
+        "schema_valid_rate": {
+          "value": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "unfound_value_rate": {
+          "value": 0.0019193857965451055,
+          "ci95": [
+            0.0,
+            0.005988023952095809
+          ]
+        },
+        "slot_counts": {
+          "tp": 393,
+          "fp": 128,
+          "fn": 76
+        },
+        "predicted_slots": 521
+      },
+      "unseen_text": {
+        "value": 0.7068273092369478,
+        "ci95": [
+          0.6646586345381527,
+          0.7449799196787149
+        ],
+        "n": 498,
+        "excluded": 2
+      },
+      "per_scenario": {
+        "alarm": {
+          "n": 16,
+          "exact_match": 0.9375
+        },
+        "audio": {
+          "n": 10,
+          "exact_match": 0.9
+        },
+        "calendar": {
+          "n": 68,
+          "exact_match": 0.6176470588235294
+        },
+        "cooking": {
+          "n": 12,
+          "exact_match": 0.6666666666666666
+        },
+        "datetime": {
+          "n": 17,
+          "exact_match": 0.7058823529411765
+        },
+        "email": {
+          "n": 45,
+          "exact_match": 0.7333333333333333
+        },
+        "general": {
+          "n": 32,
+          "exact_match": 0.375
+        },
+        "iot": {
+          "n": 37,
+          "exact_match": 0.8648648648648649
+        },
+        "lists": {
+          "n": 24,
+          "exact_match": 0.875
+        },
+        "music": {
+          "n": 14,
+          "exact_match": 0.7857142857142857
+        },
+        "news": {
+          "n": 21,
+          "exact_match": 0.7142857142857143
+        },
+        "play": {
+          "n": 65,
+          "exact_match": 0.5692307692307692
+        },
+        "qa": {
+          "n": 48,
+          "exact_match": 0.8541666666666666
+        },
+        "recommendation": {
+          "n": 16,
+          "exact_match": 0.5
+        },
+        "social": {
+          "n": 18,
+          "exact_match": 0.7777777777777778
+        },
+        "takeaway": {
+          "n": 10,
+          "exact_match": 0.6
+        },
+        "transport": {
+          "n": 21,
+          "exact_match": 0.7142857142857143
+        },
+        "weather": {
+          "n": 26,
+          "exact_match": 0.8846153846153846
+        }
+      },
+      "vs_reference": {
+        "reference": "ft-qwen3-4b-lora",
+        "subset": "S500",
+        "n": 500,
+        "complete": true,
+        "system_exact_match": {
+          "value": 0.708,
+          "ci95": [
+            0.668,
+            0.748
+          ]
+        },
+        "reference_exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.712,
+            0.788
+          ]
+        },
+        "difference": {
+          "value": -0.04200000000000004,
+          "ci95": [
+            -0.07600000000000007,
+            -0.006000000000000005
+          ],
+          "direction": "system minus reference",
+          "bootstrap_p": 0.021397860213978603
+        },
+        "mcnemar": {
+          "system_only": 29,
+          "reference_only": 50,
+          "p_value": 0.023819792858001267
+        },
+        "verdict": {
+          "relation": "reference_beats_system",
+          "text": "ft-qwen3-4b-lora beats groq-qwen3.8-27b-k10"
+        }
+      },
+      "full_test": null,
+      "model_names": {
+        "requested": "qwen/qwen3.8-27b",
+        "returned": [
+          "qwen/qwen3.8-27b"
+        ],
+        "changed": false,
+        "segments": [
+          {
+            "model": "qwen/qwen3.8-27b",
+            "rows": 500,
+            "first_row": 1,
+            "last_row": 500
+          }
+        ],
+        "answers_without_a_name": 0
+      },
+      "cost": {
+        "billing_basis": "free tier; priced at paid list price",
+        "calls": 500,
+        "prompt_tokens": 491802,
+        "completion_tokens": 13648,
+        "reasoning_tokens": 0,
+        "cacheable_prefix_tokens": 577,
+        "per_1k_calls_usd": {
+          "upper": 0.8960672000000003,
+          "lower": 0.8960672000000003
+        },
+        "price": {
+          "id": "groq-qwen3.8-27b",
+          "provider": "groq",
+          "model": "qwen/qwen3.8-27b",
+          "url": "https://console.groq.com/docs/model/qwen/qwen3.8-27b",
+          "retrieved_on": "2026-10-02",
+          "usd_per_mtok": {
+            "input": 0.8,
+            "output": 4.0
+          }
+        }
+      },
+      "cost_by_load": null,
+      "latency_observed": {
+        "p50": 0.23206275003030896,
+        "p95": 0.42981666699051857,
+        "n": 500,
+        "method": "nearest-rank",
+        "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+      },
+      "run": {
+        "summary": "results/runs/groq-qwen3.8-27b-k10__test/summary.S500.json",
+        "predictions": "results/runs/groq-qwen3.8-27b-k10__test/predictions.jsonl",
+        "summary_is_partial": false,
+        "config_hash": "c4edf0b94c8a9a9bf1acb4aaa53366e500bb6ed14f465ce28e328026caee9339",
+        "git_commit": "4c771f453864cfce4d22d482c8e1ad606a4818ef",
+        "git_dirty": true,
+        "created_at": "2026-10-05T09:37:21Z",
+        "lock": {
+          "locked_at": "2026-10-02T06:05:16Z",
+          "reason": "Dev pilot on D50 passed (schema-valid 1.000, every answer finished normally, no errors). Prompt fewshot_k10_v1 and decoding frozen. No test request has been sent.",
+          "config_hash": "c4edf0b94c8a9a9bf1acb4aaa53366e500bb6ed14f465ce28e328026caee9339",
+          "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        },
+        "subset": {
+          "name": "S500",
+          "n": 500,
+          "hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        }
+      }
+    },
+    {
+      "name": "gemini-3.5-flash-lite-k10",
+      "kind": "api",
+      "endpoint": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "prompt": "fewshot_k10_v1",
+      "tier": null,
+      "comparison_subset": "S500",
+      "status": "complete",
+      "n_subset": 500,
+      "n_scored": 500,
+      "n_calls_failed": 0,
+      "metrics": {
+        "n": 500,
+        "exact_match": {
+          "value": 0.678,
+          "ci95": [
+            0.636,
+            0.718
+          ]
+        },
+        "intent_accuracy": {
+          "value": 0.89,
+          "ci95": [
+            0.862,
+            0.916
+          ]
+        },
+        "slot_precision": {
+          "value": 0.7333333333333333,
+          "ci95": [
+            0.693359375,
+            0.7723581190092056
+          ]
+        },
+        "slot_recall": {
+          "value": 0.8208955223880597,
+          "ci95": [
+            0.7851063829787234,
+            0.8562231759656652
+          ]
+        },
+        "slot_f1": {
+          "value": 0.7746478873239437,
+          "ci95": [
+            0.7385271080038428,
+            0.809472657391478
+          ]
+        },
+        "schema_valid_rate": {
+          "value": 1.0,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "unfound_value_rate": {
+          "value": 0.0019047619047619048,
+          "ci95": [
+            0.0,
+            0.006048387096774193
+          ]
+        },
+        "slot_counts": {
+          "tp": 385,
+          "fp": 140,
+          "fn": 84
+        },
+        "predicted_slots": 525
+      },
+      "unseen_text": {
+        "value": 0.6767068273092369,
+        "ci95": [
+          0.6345381526104418,
+          0.7168674698795181
+        ],
+        "n": 498,
+        "excluded": 2
+      },
+      "per_scenario": {
+        "alarm": {
+          "n": 16,
+          "exact_match": 0.9375
+        },
+        "audio": {
+          "n": 10,
+          "exact_match": 0.9
+        },
+        "calendar": {
+          "n": 68,
+          "exact_match": 0.5588235294117647
+        },
+        "cooking": {
+          "n": 12,
+          "exact_match": 0.5833333333333334
+        },
+        "datetime": {
+          "n": 17,
+          "exact_match": 0.8823529411764706
+        },
+        "email": {
+          "n": 45,
+          "exact_match": 0.7555555555555555
+        },
+        "general": {
+          "n": 32,
+          "exact_match": 0.28125
+        },
+        "iot": {
+          "n": 37,
+          "exact_match": 0.8648648648648649
+        },
+        "lists": {
+          "n": 24,
+          "exact_match": 0.9166666666666666
+        },
+        "music": {
+          "n": 14,
+          "exact_match": 0.7142857142857143
+        },
+        "news": {
+          "n": 21,
+          "exact_match": 0.7142857142857143
+        },
+        "play": {
+          "n": 65,
+          "exact_match": 0.46153846153846156
+        },
+        "qa": {
+          "n": 48,
+          "exact_match": 0.8125
+        },
+        "recommendation": {
+          "n": 16,
+          "exact_match": 0.5
+        },
+        "social": {
+          "n": 18,
+          "exact_match": 0.7777777777777778
+        },
+        "takeaway": {
+          "n": 10,
+          "exact_match": 0.6
+        },
+        "transport": {
+          "n": 21,
+          "exact_match": 0.6190476190476191
+        },
+        "weather": {
+          "n": 26,
+          "exact_match": 0.8846153846153846
+        }
+      },
+      "vs_reference": {
+        "reference": "ft-qwen3-4b-lora",
+        "subset": "S500",
+        "n": 500,
+        "complete": true,
+        "system_exact_match": {
+          "value": 0.678,
+          "ci95": [
+            0.636,
+            0.718
+          ]
+        },
+        "reference_exact_match": {
+          "value": 0.75,
+          "ci95": [
+            0.712,
+            0.788
+          ]
+        },
+        "difference": {
+          "value": -0.07199999999999995,
+          "ci95": [
+            -0.10799999999999998,
+            -0.03600000000000003
+          ],
+          "direction": "system minus reference",
+          "bootstrap_p": 0.00019998000199980003
+        },
+        "mcnemar": {
+          "system_only": 26,
+          "reference_only": 62,
+          "p_value": 0.00015714867103001833
+        },
+        "verdict": {
+          "relation": "reference_beats_system",
+          "text": "ft-qwen3-4b-lora beats gemini-3.5-flash-lite-k10"
+        }
+      },
+      "full_test": null,
+      "model_names": {
+        "requested": "gemini-3.5-flash-lite",
+        "returned": [
+          "gemini-3.5-flash-lite"
+        ],
+        "changed": false,
+        "segments": [
+          {
+            "model": "gemini-3.5-flash-lite",
+            "rows": 500,
+            "first_row": 1,
+            "last_row": 500
+          }
+        ],
+        "answers_without_a_name": 0
+      },
+      "cost": {
+        "billing_basis": "free tier; priced at paid list price",
+        "calls": 500,
+        "prompt_tokens": 476799,
+        "completion_tokens": 14017,
+        "reasoning_tokens": 0,
+        "cacheable_prefix_tokens": 577,
+        "per_1k_calls_usd": {
+          "upper": 0.35616439999999994,
+          "lower": 0.20037439999999987
+        },
+        "price": {
+          "id": "google-gemini-3.5-flash-lite",
+          "provider": "google",
+          "model": "gemini-3.5-flash-lite",
+          "url": "https://ai.google.dev/gemini-api/docs/pricing",
+          "retrieved_on": "2026-10-02",
+          "usd_per_mtok": {
+            "input": 0.3,
+            "cached_input": 0.03,
+            "output": 2.5
+          }
+        }
+      },
+      "cost_by_load": null,
+      "latency_observed": {
+        "p50": 1.04667824995704,
+        "p95": 1.549960165983066,
+        "n": 500,
+        "method": "nearest-rank",
+        "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+      },
+      "run": {
+        "summary": "results/runs/gemini-3.5-flash-lite-k10__test/summary.S500.json",
+        "predictions": "results/runs/gemini-3.5-flash-lite-k10__test/predictions.jsonl",
+        "summary_is_partial": false,
+        "config_hash": "d55c5379500c3a466c084ebed04fe3f16a3316626e92e9f83ff0a97965b870dd",
+        "git_commit": "f10555f57bda435659b1a62f8ea7f23d53e9687e",
+        "git_dirty": true,
+        "created_at": "2026-10-03T09:35:10Z",
+        "lock": {
+          "locked_at": "2026-10-02T08:41:38Z",
+          "reason": "Dev pilot on D50 passed (schema-valid 1.000, every answer finished normally, no errors). Prompt fewshot_k10_v1 and decoding frozen (reasoning_effort minimal, the least the model accepts). No test request has been sent.",
+          "config_hash": "d55c5379500c3a466c084ebed04fe3f16a3316626e92e9f83ff0a97965b870dd",
+          "subset_hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        },
+        "subset": {
+          "name": "S500",
+          "n": 500,
+          "hash": "9ec8dbc8de3a4d6b314a07b07d29aba873ba064c7c994b3e27d0db4908570df9"
+        }
+      }
+    }
+  ],
+  "self_hosted": {
+    "benchmark": {
+      "path": "results/serving/T4.json",
+      "gpu": "Tesla T4",
+      "other_files": [
+        "results/serving/dev_select.json",
+        "results/serving/dev_select_v1_hf_transformers.json",
+        "results/serving/test_run.json"
+      ]
+    },
+    "systems": {
+      "ft-qwen3-4b-lora": {
+        "levels": [
+          {
+            "concurrency": 1,
+            "requests_per_s": 0.7902971279704475,
+            "p50_s": 1.263791477000268,
+            "p95_s": 2.265675778000059,
+            "n": 1000
+          },
+          {
+            "concurrency": 8,
+            "requests_per_s": 5.385338207373253,
+            "p50_s": 1.4740067720003935,
+            "p95_s": 2.5726369000003615,
+            "n": 1000
+          },
+          {
+            "concurrency": 32,
+            "requests_per_s": 14.397749937930618,
+            "p50_s": 2.1623028639996846,
+            "p95_s": 3.694262458000594,
+            "n": 1000
+          },
+          {
+            "concurrency": 64,
+            "requests_per_s": 21.613672298010005,
+            "p50_s": 2.864285048999591,
+            "p95_s": 4.674049363999984,
+            "n": 1000
+          }
+        ],
+        "single_stream": {
+          "concurrency": 1,
+          "requests_per_s": 0.7902971279704475,
+          "p50_s": 1.263791477000268,
+          "p95_s": 2.265675778000059,
+          "n": 1000
+        },
+        "operating_point": null,
+        "cost": null
+      },
+      "base-qwen3-4b-k10": {
+        "levels": null,
+        "single_stream": null,
+        "operating_point": null,
+        "cost": null
+      }
+    }
+  },
+  "break_even": {
+    "gpu": {
+      "id": "aws-g4dn.xlarge",
+      "gpu": "1x NVIDIA T4",
+      "url": "https://instances.vantage.sh/aws/ec2/g4dn.xlarge",
+      "retrieved_on": "2026-10-01",
+      "price_basis": "on_demand",
+      "usd_per_hour": 0.526,
+      "hours_per_month": 730,
+      "monthly_usd": 383.98
+    },
+    "self_hosted_system": "ft-qwen3-4b-lora",
+    "requests_per_s": null,
+    "capacity_calls_per_month": null,
+    "apis": {
+      "groq-gpt-oss-20b-k10": {
+        "per_1k_calls_usd": {
+          "upper": 0.12895094999999993,
+          "lower": 0.10702495000000002
+        },
+        "calls_per_month": {
+          "no_caching": 2977721.373902249,
+          "cached_prefix": 3587761.545321908
+        },
+        "requests_per_s": {
+          "no_caching": 1.1330751042246001,
+          "cached_prefix": 1.3652060674740898
+        },
+        "within_capacity": {
+          "no_caching": null,
+          "cached_prefix": null
+        },
+        "within_capacity_by_concurrency": {
+          "1": {
+            "no_caching": false,
+            "cached_prefix": false
+          },
+          "8": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "32": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "64": {
+            "no_caching": true,
+            "cached_prefix": true
+          }
+        }
+      },
+      "groq-gpt-oss-120b-k10": {
+        "per_1k_calls_usd": {
+          "upper": 0.25993406813627284,
+          "lower": 0.2166590681362726
+        },
+        "calls_per_month": {
+          "no_caching": 1477220.7535285254,
+          "cached_prefix": 1772277.5386372805
+        },
+        "requests_per_s": {
+          "no_caching": 0.5621083537018742,
+          "cached_prefix": 0.6743826250522377
+        },
+        "within_capacity": {
+          "no_caching": null,
+          "cached_prefix": null
+        },
+        "within_capacity_by_concurrency": {
+          "1": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "8": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "32": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "64": {
+            "no_caching": true,
+            "cached_prefix": true
+          }
+        }
+      },
+      "groq-qwen3.8-27b-k10": {
+        "per_1k_calls_usd": {
+          "upper": 0.8960672000000003,
+          "lower": 0.8960672000000003
+        },
+        "calls_per_month": {
+          "no_caching": 428516.9683702293,
+          "cached_prefix": 428516.9683702293
+        },
+        "requests_per_s": {
+          "no_caching": 0.1630582071424008,
+          "cached_prefix": 0.1630582071424008
+        },
+        "within_capacity": {
+          "no_caching": null,
+          "cached_prefix": null
+        },
+        "within_capacity_by_concurrency": {
+          "1": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "8": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "32": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "64": {
+            "no_caching": true,
+            "cached_prefix": true
+          }
+        }
+      },
+      "gemini-3.5-flash-lite-k10": {
+        "per_1k_calls_usd": {
+          "upper": 0.35616439999999994,
+          "lower": 0.20037439999999987
+        },
+        "calls_per_month": {
+          "no_caching": 1078097.64254934,
+          "cached_prefix": 1916312.6626954353
+        },
+        "requests_per_s": {
+          "no_caching": 0.4102350238011187,
+          "cached_prefix": 0.7291905109191155
+        },
+        "within_capacity": {
+          "no_caching": null,
+          "cached_prefix": null
+        },
+        "within_capacity_by_concurrency": {
+          "1": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "8": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "32": {
+            "no_caching": true,
+            "cached_prefix": true
+          },
+          "64": {
+            "no_caching": true,
+            "cached_prefix": true
+          }
+        }
+      }
+    }
+  },
+  "latency": {
+    "policy": "Headline latency is the self-hosted rows measured on the box (p50 and p95 at every concurrency level, p95 at the operating point when there is one). API latency is an appendix.",
+    "self_hosted": {
+      "basis": "on the box (no network path)",
+      "gpu": "Tesla T4",
+      "systems": {
+        "ft-qwen3-4b-lora": {
+          "concurrency_1": {
+            "concurrency": 1,
+            "requests_per_s": 0.7902971279704475,
+            "p50_s": 1.263791477000268,
+            "p95_s": 2.265675778000059,
+            "n": 1000
+          },
+          "operating_point": null
+        }
+      }
+    },
+    "api_appendix": {
+      "label": "observed on free tiers from India; not representative of paid tiers",
+      "systems": {
+        "groq-gpt-oss-20b-k10": {
+          "p50": 0.518688292009756,
+          "p95": 1.0783252919791266,
+          "n": 500,
+          "method": "nearest-rank",
+          "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+        },
+        "groq-gpt-oss-120b-k10": {
+          "p50": 0.5719324169913307,
+          "p95": 1.1181340410839766,
+          "n": 499,
+          "method": "nearest-rank",
+          "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+        },
+        "groq-qwen3.8-27b-k10": {
+          "p50": 0.23206275003030896,
+          "p95": 0.42981666699051857,
+          "n": 500,
+          "method": "nearest-rank",
+          "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+        },
+        "gemini-3.5-flash-lite-k10": {
+          "p50": 1.04667824995704,
+          "p95": 1.549960165983066,
+          "n": 500,
+          "method": "nearest-rank",
+          "note": "seconds for the successful attempt; excludes rate-limit waits and backoff"
+        }
+      }
+    }
+  },
+  "sources": {
+    "prices": {
+      "groq-gpt-oss-20b": {
+        "provider": "groq",
+        "model": "openai/gpt-oss-20b",
+        "url": "https://console.groq.com/docs/model/openai/gpt-oss-20b",
+        "retrieved_on": "2026-10-02",
+        "usd_per_mtok": {
+          "input": 0.075,
+          "cached_input": 0.037,
+          "output": 0.3
+        }
+      },
+      "groq-gpt-oss-120b": {
+        "provider": "groq",
+        "model": "openai/gpt-oss-120b",
+        "url": "https://console.groq.com/docs/model/openai/gpt-oss-120b",
+        "retrieved_on": "2026-10-01",
+        "usd_per_mtok": {
+          "input": 0.15,
+          "cached_input": 0.075,
+          "output": 0.6
+        }
+      },
+      "groq-qwen3.8-27b": {
+        "provider": "groq",
+        "model": "qwen/qwen3.8-27b",
+        "url": "https://console.groq.com/docs/model/qwen/qwen3.8-27b",
+        "retrieved_on": "2026-10-02",
+        "usd_per_mtok": {
+          "input": 0.8,
+          "output": 4.0
+        }
+      },
+      "google-gemini-3.5-flash-lite": {
+        "provider": "google",
+        "model": "gemini-3.5-flash-lite",
+        "url": "https://ai.google.dev/gemini-api/docs/pricing",
+        "retrieved_on": "2026-10-02",
+        "usd_per_mtok": {
+          "input": 0.3,
+          "cached_input": 0.03,
+          "output": 2.5
+        }
+      }
+    },
+    "gpu_rental": {
+      "id": "aws-g4dn.xlarge",
+      "gpu": "1x NVIDIA T4",
+      "url": "https://instances.vantage.sh/aws/ec2/g4dn.xlarge",
+      "retrieved_on": "2026-10-01",
+      "price_basis": "on_demand",
+      "usd_per_hour": 0.526,
+      "hours_per_month": 730,
+      "monthly_usd": 383.98
+    }
+  },
+  "warnings": [
+    "results/serving/T4.json, ft-qwen3-4b-lora: no operating point (no concurrency level had p95 latency <= 1 s with no failed request)"
+  ]
+}

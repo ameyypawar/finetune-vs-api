@@ -88,7 +88,7 @@ LATENCY_POLICY = (
 #: Why `cost_by_load.operating_point` is null. The first is what a null operating point means when the levels agree;
 #: the second is used when some level did have p95 <= P95_LIMIT_S, so nothing is claimed about the rule.
 NO_OPERATING_POINT_NOTE = (
-    f"No level met the p95 <= {P95_LIMIT_S:g} s rule, so cost is reported at every measured level instead."
+    f"No level met the rule for an operating point (p95 latency at or under {P95_LIMIT_S:g} s), so cost is reported at every measured level instead."
 )
 UNDECLARED_OPERATING_POINT_NOTE = (
     "The benchmark file names no usable operating point, so cost is reported at every measured level instead."

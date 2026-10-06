@@ -215,7 +215,7 @@ def test_a_system_without_a_cost_is_left_out_and_named(world):
     labels = texts(fig)
     assert BASE not in labels  # no point and no label of its own
     note = next(t for t in labels if t.startswith("Error bars"))
-    assert "Not shown, no result or no cost yet: base-qwen3-4b-k10." in note.replace("\n", " ")
+    assert "Not shown, no cost measured: base-qwen3-4b-k10." in note.replace("\n", " ")
     assert "free tier; priced at paid list price (no money was spent)" in note.replace("\n", " ")
 
 
@@ -388,7 +388,7 @@ def test_a_load_level_without_a_cost_is_left_out_and_named(sweep):
     for level in ft_of(gap)["cost_by_load"]["levels"]:
         level["per_1k_calls_usd"] = {"on_demand": None, "spot": None}
     note = next(t for t in texts(figures.plot_accuracy_vs_cost(gap)) if t.startswith("Error bars")).replace("\n", " ")
-    assert f"Not shown, no result or no cost yet: {FT}, {BASE}." in note
+    assert f"Not shown, no cost measured: {FT}, {BASE}." in note
 
 
 def test_grid_lines_are_solid_hairlines_never_dashed(world):
@@ -927,7 +927,7 @@ def test_the_note_under_the_cost_figure_fits_when_every_optional_sentence_is_the
     fig = figures.plot_accuracy_vs_cost(long)
     renderer = _render(fig)
     note = next(t for t in fig.texts if t.get_text())
-    for sentence in ("so it has one bar", "no result or no cost yet", "Load levels not shown, no cost"):
+    for sentence in ("so it has one bar", "Not shown, no result yet", "Load levels not shown, no cost"):
         assert sentence in note.get_text().replace("\n", " ")
     box = note.get_window_extent(renderer)
     lines = note.get_text().count("\n") + 1

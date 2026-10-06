@@ -105,8 +105,10 @@ class Repo:
 
     @classmethod
     def committed(cls, root: Path) -> Repo:
-        """What CI has: the real configs, and the audit and subsets that are committed. No results."""
+        """A checkout with no results: the real configs, the committed audit and subsets, and README.md with
+        nothing between the markers."""
         repo = cls(root)
+        repo.path("README.md").write_text(without_results(repo.read("README.md")), encoding="utf-8")
         shutil.copytree(ROOT / "configs", repo.root / "configs")
         (repo.root / "results").mkdir()
         for name in ("data_audit.json", "subsets.json"):
@@ -140,6 +142,13 @@ class Repo:
     def region(self) -> str:
         text = self.read("README.md")
         return text[text.index(START) + len(START) : text.index(END)]
+
+
+def without_results(readme: str) -> str:
+    """README.md as a checkout with no results has it: nothing between the markers."""
+    head, _, rest = readme.partition(START)
+    _, _, tail = rest.partition(END)
+    return head + START + "\n" + END + tail
 
 
 def tables_in(text: str) -> list[tuple[list[str], str]]:
@@ -192,7 +201,7 @@ def test_only_the_region_between_the_markers_changes(standard, tmp_path):
     _, _, tail = rest.partition(END)
     assert updated.startswith(head + START + "\n") and updated.endswith(END + tail)  # outside the markers: untouched
     assert updated.count(START) == updated.count(END) == 1
-    assert len(updated) > len(original) + 1500 and "### Exact match, paired against the fine-tune" in repo.region()
+    assert len(repo.region()) > 1500 and "### Exact match, paired against the fine-tune" in repo.region()  # not vacuous
 
 
 def test_rendering_again_gives_the_same_file_and_replaces_stale_content(standard, tmp_path):
@@ -207,9 +216,9 @@ def test_rendering_again_gives_the_same_file_and_replaces_stale_content(standard
     assert code == 0 and lines == ["current: README.md"] and repo.read("README.md") == first
 
 
-def test_with_no_results_the_committed_readme_is_byte_identical(tmp_path):
+def test_with_no_results_a_readme_with_an_empty_region_is_byte_identical(tmp_path):
     repo = Repo.committed(tmp_path / "repo")
-    before = (ROOT / "README.md").read_bytes()
+    before = without_results((ROOT / "README.md").read_text()).encode()
     assert repo.render("readme") == (0, ["current: README.md"])
     assert repo.path("README.md").read_bytes() == before
     assert repo.render("readme", check=True) == (0, ["current: README.md"])
@@ -228,7 +237,7 @@ def test_results_that_go_away_clear_the_region(tmp_path):
     text = repo.read("README.md").replace(START + "\n" + END, START + "\nold generated tables\n" + END)
     repo.path("README.md").write_text(text, encoding="utf-8")
     repo.render("readme")
-    assert repo.region() == "\n" and repo.read("README.md") == (ROOT / "README.md").read_text()
+    assert repo.region() == "\n" and repo.read("README.md") == without_results((ROOT / "README.md").read_text())
 
 
 @pytest.mark.parametrize(
@@ -714,8 +723,8 @@ def test_the_writeup_gives_the_cost_break_even_and_latency_from_the_results(stan
     repo.render("writeup")
     text = repo.read("docs/writeup.md")
     assert "608,333 to 304,167" in text and "$0.0139" in text and "$0.600 to $1.20" in text
-    # groq-qwen3.8-27b has no cached-input price, so both ends of its cost and its break-even are the same figure
-    assert re.search(rf"\| `{QWEN_27B}` \| paid list price \| (\$[\d.,]+) to \1 \| ([\d,]+) to \2 \|", text)
+    # groq-qwen3.8-27b has no cached-input price, so its cost and its break-even are one figure each, not a range
+    assert re.search(rf"\| `{QWEN_27B}` \| paid list price \| \$[\d.,]+ with or without caching \| [\d,]+ \|", text)
     assert "rented around the clock for 730 hours at the on-demand price ($0.5 an hour) costs $365.00 a month" in text
     # what one GPU serves and the latency, at the operating point and at a single stream, are rows of the by-load table
     # (they were a sentence before: 26,280,000 calls a month; p95 1.20 s under load and 0.60 s for a single stream)
@@ -790,7 +799,7 @@ def test_figures_are_linked_only_when_they_exist(standard, no_operating_point, t
 
 # --- the table of cost and latency by load ---------------------------------------------------------------------------------------
 
-NO_OPERATING_POINT_NOTE = "No level met the p95 <= 1 s rule, so cost is reported at every measured level instead."
+NO_OPERATING_POINT_NOTE = "No level met the rule for an operating point (p95 latency at or under 1 s), so cost is reported at every measured level instead."
 FULL_HEADERS = [
     "Concurrency", "Requests/s", "p50", "p95", "Cost per 1,000 calls, on-demand", "Cost per 1,000 calls, spot",
     "Calls one GPU serves a month", "APIs whose break-even range one GPU can serve",
@@ -1067,8 +1076,9 @@ def test_the_model_card_has_a_serving_section_only_when_results_exist(no_operati
     assert "Serving cost and latency" not in without.read("hf/README.md")
 
 
-def test_with_no_results_the_committed_generated_files_do_not_change(tmp_path):
-    """The by-load section exists only in the results branches of the templates: the three committed files stay as they are."""
+def test_with_no_results_the_generated_files_have_no_results_in_them(tmp_path):
+    """The by-load section exists only in the results branches of the templates. (That the committed files match the
+    committed results is CI's `render.py --check`.)"""
     repo = Repo.committed(tmp_path / "repo")
     for optional in ("results/train_log.json", "results/error_analysis.csv", "docs/error_analysis.md"):  # inputs the real files used
         if (ROOT / optional).exists():
@@ -1076,8 +1086,7 @@ def test_with_no_results_the_committed_generated_files_do_not_change(tmp_path):
             shutil.copy(ROOT / optional, repo.path(optional))
     code, _ = repo.render()
     assert code == 0
-    for name in ("README.md", "hf/README.md", "docs/writeup.md"):
-        assert repo.path(name).read_bytes() == (ROOT / name).read_bytes(), name
+    assert repo.read("README.md") == without_results((ROOT / "README.md").read_text())
     assert "Concurrency" not in repo.read("docs/writeup.md") and "by load" not in repo.read("hf/README.md")
 
 
