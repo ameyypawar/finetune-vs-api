@@ -327,19 +327,49 @@ def all_outputs(repo: Repo) -> dict[str, str]:
     return {"README.md": repo.region(), "hf/README.md": repo.read("hf/README.md"), "docs/writeup.md": repo.read("docs/writeup.md")}
 
 
-def test_every_table_carries_the_notice_and_the_sources(standard, tmp_path):
+def test_every_table_carries_the_notice_and_each_document_lists_the_sources_once(standard, tmp_path):
     lab, doc = standard
     outputs = all_outputs(Repo.with_results(tmp_path / "repo", lab))
     counts = {name: len(tables_in(text)) for name, text in outputs.items()}
     assert counts["README.md"] >= 5 and counts["hf/README.md"] >= 1 and counts["docs/writeup.md"] >= 2  # not vacuous
     urls = {e["url"]: e["retrieved_on"] for e in doc["sources"]["prices"].values()}
     urls[doc["sources"]["gpu_rental"]["url"]] = doc["sources"]["gpu_rental"]["retrieved_on"]
+    assert len(urls) >= 2  # not vacuous: price pages and the GPU rental page
     for name, text in outputs.items():
         for table, after in tables_in(text):
-            assert after.startswith(NOTICE), (name, table[0])
-            for url, day in urls.items():
-                assert f"<{url}> (retrieved {day})" in after, (name, url)
-            assert "Prices: <https://" in after and "GPU rental: <https://" in after, name
+            assert after == NOTICE + "*", (name, table[0])  # the notice alone: the sources are not repeated per table
+        for url, day in urls.items():
+            assert text.count(f"<{url}> (retrieved {day})") == 1, (name, url)
+        assert text.count("Prices: <https://") == 1 and text.count("GPU rental: <https://") == 1, name
+
+
+def test_the_sources_are_listed_where_each_document_puts_its_costs(standard, tmp_path):
+    lab, _ = standard
+    outputs = all_outputs(Repo.with_results(tmp_path / "repo", lab))
+    readme, card, writeup = outputs["README.md"], outputs["hf/README.md"], outputs["docs/writeup.md"]
+    # outside the collapsed block in the README, so a reader who never opens it still sees them
+    assert readme.index("</details>") < readme.index("*Prices: <") < readme.index("Definitions and caveats")
+    assert writeup.index("## Cost and break-even") < writeup.index("*Prices: <") < writeup.index("## Why now")
+    assert card.index("## Evaluation") < card.index("*Prices: <") < card.index("## Limitations")
+
+
+def test_with_no_cost_table_the_writeup_lists_the_sources_under_its_results(tmp_path, monkeypatch):
+    """Only the self-hosted rows have results and no benchmark was read: no table of costs, so the GPU rental
+    source follows the results table instead."""
+    monkeypatch.setattr(config, "git_commit", lambda cwd=None: None)
+    monkeypatch.setattr(config, "git_dirty", lambda cwd=None: False)
+    lab = Lab(tmp_path / "lab")
+    for system in (FT, BASE):
+        lab.write_run(system)
+    lab.write_audit()
+    lab.write_subsets()
+    doc = comparison_for(lab)
+    assert not doc["sources"]["prices"] and doc["sources"]["gpu_rental"]  # not vacuous
+    repo = Repo.with_results(tmp_path / "repo", lab, figures_=False)
+    repo.render("writeup")
+    writeup = repo.read("docs/writeup.md")
+    assert writeup.count("GPU rental: <https://") == 1 and "Prices: <" not in writeup
+    assert writeup.index("## Results") < writeup.index("*GPU rental: <") < writeup.index("## Where the gap comes from")
 
 
 def test_the_templates_never_write_a_table_by_hand():
@@ -359,12 +389,11 @@ def test_the_default_reference_is_the_one_compare_uses():
     assert render.DEFAULT_REFERENCE == compare.REFERENCE
 
 
-def test_md_table_escapes_pipes_and_checks_its_alignment(standard):
-    _, doc = standard
-    table = render.md_table(doc, ["a|b", "c"], [["x|y", "z"]], "lr")
-    assert table.startswith("| a\\|b | c |\n|---|---:|\n| x\\|y | z |\n\n" + NOTICE)
+def test_md_table_escapes_pipes_and_checks_its_alignment():
+    table = render.md_table(["a|b", "c"], [["x|y", "z"]], "lr")
+    assert table == "| a\\|b | c |\n|---|---:|\n| x\\|y | z |\n\n" + NOTICE + "*"
     with pytest.raises(ValueError, match="2 columns"):
-        render.md_table(doc, ["a", "b"], [], "l")
+        render.md_table(["a", "b"], [], "l")
 
 
 # --- generated numbers only --------------------------------------------------------------------------------------------------
@@ -826,7 +855,7 @@ def test_the_by_load_table_is_in_the_readme_the_card_and_the_writeup_with_every_
         assert header == FULL_HEADERS and list(rows) == list(BY_LOAD_ROWS)
         for load, expected in BY_LOAD_ROWS.items():
             assert rows[load] == [*expected, ALL_APIS], load
-        assert after.startswith(NOTICE)  # the table is built by md_table, so the notice and the sources follow it
+        assert after.startswith(NOTICE)  # the table is built by md_table, so the notice follows it
     header, rows, after = by_load_table(writeup)  # the compact one, for a write-up of at most 1,200 words
     assert header == COMPACT_HEADERS and list(rows) == list(BY_LOAD_ROWS) and after.startswith(NOTICE)
     for load, row in BY_LOAD_ROWS.items():

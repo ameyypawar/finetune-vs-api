@@ -12,8 +12,9 @@ results/data_audit.json, results/subsets.json, results/train_log.json, configs/*
 or the code. The templates hold prose and no figures; tests/test_render.py fails if a template
 types a number. The output has no date or time in it, so rendering twice gives the same bytes.
 
-Every table is followed by the same notice, with the source URLs and the dates they were read on,
-because the tables are only ever built by `md_table` here, which adds it.
+Every table is followed by the same notice, because the tables are only ever built by `md_table` here,
+which adds it. The URLs the prices and the GPU rental price were read from, with the dates, are listed
+once per document (`sources_note`), after its last table of costs.
 
 The fine-tune's cost and latency at every measured load level (`cost_by_load` in the comparison) are one
 table, `by_load_table`: in full in the README and the card, and with fewer columns in the write-up, which
@@ -66,7 +67,7 @@ COMPARISON_SCHEMA_VERSION = 1
 EXIT_STALE = 1
 EXIT_ERROR = 2
 
-#: Printed under every table, with the sources. The wording is the project's, not a result.
+#: Printed under every table. The wording is the project's, not a result.
 TABLE_NOTICE = "All API rows ran on free tiers; no money was spent; costs are at paid list prices."
 #: The label on API latency; the same words as scripts/compare.py writes into comparison.json (a test keeps them equal).
 API_LATENCY_LABEL = "observed on free tiers from India; not representative of paid tiers"
@@ -179,27 +180,28 @@ def _cell(text: Any) -> str:
 # --- the notice and the tables ---------------------------------------------------------------------------
 
 
-def table_notice(doc: Mapping[str, Any]) -> str:
-    """The sentence under every table: the basis of the costs, and where the prices were read."""
+def sources_note(doc: Mapping[str, Any]) -> str | None:
+    """Where the prices and the GPU rental price were read, with the dates. Each document shows it once, after
+    its last table of costs; the notice under every table says what the costs are."""
     sources = doc.get("sources") or {}
-    parts = [TABLE_NOTICE]
+    parts = []
     prices = {entry["url"]: entry["retrieved_on"] for entry in (sources.get("prices") or {}).values()}
     if prices:
         parts.append("Prices: " + ", ".join(f"<{url}> (retrieved {day})" for url, day in prices.items()) + ".")
     gpu = sources.get("gpu_rental")
     if gpu:
         parts.append(f"GPU rental: <{gpu['url']}> (retrieved {gpu['retrieved_on']}).")
-    return "*" + " ".join(parts) + "*"
+    return "*" + " ".join(parts) + "*" if parts else None
 
 
-def md_table(doc: Mapping[str, Any], headers: Sequence[str], rows: Sequence[Sequence[Any]], align: str) -> str:
+def md_table(headers: Sequence[str], rows: Sequence[Sequence[Any]], align: str) -> str:
     """A markdown table followed by the notice. `align` has one letter per column: l (left) or r (right)."""
     if len(align) != len(headers):
         raise ValueError(f"{len(headers)} columns but align={align!r}")
     rules = ["---" if a == "l" else "---:" for a in align]
     lines = ["| " + " | ".join(_cell(h) for h in headers) + " |", "|" + "|".join(rules) + "|"]
     lines += ["| " + " | ".join(_cell(c) for c in row) + " |" for row in rows]
-    return "\n".join(lines) + "\n\n" + table_notice(doc)
+    return "\n".join(lines) + "\n\n*" + TABLE_NOTICE + "*"
 
 
 def _code(name: str) -> str:
@@ -243,7 +245,7 @@ def accuracy_table(doc: Mapping[str, Any], *, compact: bool = False) -> str:
             keep.remove(1)
         headers, align = [headers[i] for i in keep], "".join(align[i] for i in keep)
         rows = [[row[i] for i in keep] for row in rows]
-    return md_table(doc, headers, rows, align)
+    return md_table(headers, rows, align)
 
 
 def cost_table(doc: Mapping[str, Any], *, compact: bool = False) -> str | None:
@@ -273,7 +275,7 @@ def cost_table(doc: Mapping[str, Any], *, compact: bool = False) -> str | None:
         keep = [0, 2, 3]
         headers, align = [headers[i] for i in keep], "".join(align[i] for i in keep)
         rows = [[row[i] for i in keep] for row in rows]
-    return md_table(doc, headers, rows, align)
+    return md_table(headers, rows, align)
 
 
 def latency_table(doc: Mapping[str, Any]) -> str | None:
@@ -292,7 +294,7 @@ def latency_table(doc: Mapping[str, Any]) -> str | None:
     if not rows:
         return None
     headers = ["System", "p50, concurrency 1", "p95, concurrency 1", "p95 at the operating point", "Operating point"]
-    return md_table(doc, headers, rows, "lrrrl")
+    return md_table(headers, rows, "lrrrl")
 
 
 def by_load_block(doc: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -336,14 +338,14 @@ def by_load_table(doc: Mapping[str, Any], *, compact: bool = False) -> str | Non
         )
     if compact:
         headers = ["Concurrency", "p95 (s)", "On-demand (spot) per 1,000 calls", "Calls one GPU serves a month"]
-        return md_table(doc, headers, rows, "rrrr")
+        return md_table(headers, rows, "rrrr")
     headers = [
         "Concurrency", "Requests/s", "p50", "p95", "Cost per 1,000 calls, on-demand", "Cost per 1,000 calls, spot",
         "Calls one GPU serves a month",
     ]
     if apis:
         headers.append("APIs whose break-even range one GPU can serve")
-    return md_table(doc, headers, rows, "r" * 7 + ("l" if apis else ""))
+    return md_table(headers, rows, "r" * 7 + ("l" if apis else ""))
 
 
 def shown_warnings(doc: Mapping[str, Any]) -> list[str]:
@@ -372,7 +374,7 @@ def api_latency_table(doc: Mapping[str, Any]) -> str | None:
     ]
     if not rows:
         return None
-    return md_table(doc, ["System", "p50", "p95", "Calls"], rows, "lrrr")
+    return md_table(["System", "p50", "p95", "Calls"], rows, "lrrr")
 
 
 def other_metrics_table(doc: Mapping[str, Any]) -> str:
@@ -393,7 +395,7 @@ def other_metrics_table(doc: Mapping[str, Any]) -> str:
             ]
         )
     headers = ["System", "Intent accuracy", "Slot F1", "Schema-valid", "Slot values not in the request", "Exact match without items whose text is in train"]
-    return md_table(doc, headers, rows, "lrrrrr")
+    return md_table(headers, rows, "lrrrrr")
 
 
 def scenario_table(doc: Mapping[str, Any]) -> str | None:
@@ -408,7 +410,7 @@ def scenario_table(doc: Mapping[str, Any]) -> str | None:
             cell = s["per_scenario"].get(scenario)
             cells.append(f"{pct(cell['exact_match'], 0)} ({cell['n']})" if cell else "-")
         rows.append([scenario, *cells])
-    return md_table(doc, ["Scenario", *[_code(s["name"]) for s in scored]], rows, "l" + "r" * len(scored))
+    return md_table(["Scenario", *[_code(s["name"]) for s in scored]], rows, "l" + "r" * len(scored))
 
 
 # --- what the prose says --------------------------------------------------------------------------------------
@@ -662,6 +664,7 @@ def build_context(root: Path, results_dir: Path, config_dir: Path, *, need_datas
         },
         "deprecations": sources["openai_deprecations"],
         "table_notice": TABLE_NOTICE,
+        "sources_note": None,
         "bootstrap": {"resamples": metrics.BOOTSTRAP_RESAMPLES, "confidence": 0.95},
         "hours_per_month": cost.HOURS_PER_MONTH,
         "error_analysis": analysis,
@@ -748,6 +751,7 @@ def comparison_context(doc: Mapping[str, Any], dataset: Mapping[str, Any] | None
         "subset_sizes": {name: info["n"] for name, info in doc["subsets"]["info"].items()},
         "bootstrap": {"resamples": doc["bootstrap"]["resamples"], "confidence": doc["bootstrap"]["confidence"]},
         "pending_names": ", ".join(_code(s["name"]) for s in doc["systems"] if not s["metrics"]),
+        "sources_note": sources_note(doc),
     }
 
 

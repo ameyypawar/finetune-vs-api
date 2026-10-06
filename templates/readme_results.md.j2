@@ -1,6 +1,7 @@
 {# The region of README.md between the results markers. Renders to nothing when there are no results,
    which leaves README.md exactly as committed. Prose only: every number and every table comes from
-   scripts/render.py, which builds the tables and puts the notice under each one. #}
+   scripts/render.py, which builds the tables, puts the notice under each one, and builds the note of
+   price sources that is placed once, before the closing line. #}
 {% if has_results %}
 ### Exact match, paired against the fine-tune
 
@@ -75,6 +76,10 @@ Not compared yet, because they have no results: {{ pending_names }}.
 {% for warning in warnings %}
 - {{ warning }}
 {% endfor %}
+{% endif %}
+{% if sources_note %}
+
+{{ sources_note }}
 {% endif %}
 
 Definitions and caveats are in [docs/method.md](docs/method.md). Every number is in `results/comparison.json`.

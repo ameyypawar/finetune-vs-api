@@ -28,7 +28,7 @@ The fine-tune is a LoRA adapter (rank 16, alpha 32, 2 epochs) fitted to the huma
 | `groq-qwen3.8-27b-k10` | 70.8% [66.8, 74.8] | -4.2 pp [-7.6, -0.6] | the fine-tune beats it |
 | `gemini-3.5-flash-lite-k10` | 67.8% [63.6, 71.8] | -7.2 pp [-10.8, -3.6] | the fine-tune beats it |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 ![Exact match against cost per 1,000 calls](../results/figures/accuracy_vs_cost.png)
 
@@ -62,7 +62,7 @@ This is the slot for the hand-labelled error analysis: the errors go in `results
 | `groq-qwen3.8-27b-k10` | $0.896 with or without caching | 428,517 |
 | `gemini-3.5-flash-lite-k10` | $0.200 to $0.356 | 1,916,313 to 1,078,098 |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 A 1x NVIDIA T4 instance rented around the clock for 730 hours at the on-demand price ($0.526 an hour) costs $383.98 a month. Break-even is the monthly volume above which the rental costs less. No level met the rule for an operating point (p95 latency at or under 1 s), so cost is reported at every measured level instead. Self-hosted cost assumes a GPU kept busy; an idle one costs proportionally more.
 
@@ -73,7 +73,9 @@ A 1x NVIDIA T4 instance rented around the clock for 730 hours at the on-demand p
 | 32 | 3.69 | $0.0101 ($0.0053) | 37,837,287 |
 | 64 | 4.67 | $0.0068 ($0.0035) | 56,800,731 |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
+
+*Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
 
 ## Why now
 

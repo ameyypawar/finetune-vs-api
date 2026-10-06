@@ -274,8 +274,9 @@ The write-up counts the categories. The reading of them is written by hand in `d
   The README, the card and the write-up each show the table of self-hosted cost and latency by load when a
   benchmark was read (the write-up's has fewer columns, to stay short).
   Every number comes from a file and none is typed into a template. Every table is followed by the same
-  notice, with the source URLs and the dates they were read on: all API rows ran on free tiers, no money was
-  spent, and costs are at paid list prices.
+  notice: all API rows ran on free tiers, no money was spent, and costs are at paid list prices. Each document
+  lists the URLs the prices and the GPU rental price were read from, with the dates, once, after its last table
+  of costs.
 - Optional inputs that the card and write-up use when they exist: `results/train_log.json` (written by
   `kaggle/train_on_kaggle.py`), `results/error_analysis.csv` (drawn by `scripts/sample_errors.py`, then
   labelled by hand; its `category` column is counted, and a file with no label yet is ignored) and `docs/error_analysis.md` (the hand-written reading, included verbatim in the

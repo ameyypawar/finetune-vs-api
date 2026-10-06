@@ -175,6 +175,10 @@ Warnings from the comparison:
 - {{ warning }}
 {% endfor %}
 {% endif %}
+{% if sources_note %}
+
+{{ sources_note }}
+{% endif %}
 {% else %}
 The evaluation compares this adapter with the untuned base model and with API models on a fixed test subset, using paired bootstrap intervals and an exact McNemar test. The table will appear here once the test runs exist.
 {% endif %}

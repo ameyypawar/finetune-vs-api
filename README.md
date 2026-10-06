@@ -51,7 +51,7 @@ Every system is compared with `ft-qwen3-4b-lora` on the items both have answered
 | `groq-qwen3.8-27b-k10` | S500 (500) | 70.8% [66.8, 74.8] | -4.2 pp [-7.6, -0.6] | 0.024 | the fine-tune beats it | - |
 | `gemini-3.5-flash-lite-k10` | S500 (500) | 67.8% [63.6, 71.8] | -7.2 pp [-10.8, -3.6] | <0.001 | the fine-tune beats it | - |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 ![Exact match against cost per 1,000 calls, with a logarithmic cost axis: each API as a range from its cached-prefix cost to its no-caching cost, the fine-tune as one marker for each measured load](results/figures/accuracy_vs_cost.png)
 
@@ -66,7 +66,7 @@ Costs are what the same calls would cost at the providers' paid list prices, as 
 | `groq-qwen3.8-27b-k10` | paid list price | $0.896 with or without caching | 428,517 |
 | `gemini-3.5-flash-lite-k10` | paid list price | $0.200 to $0.356 | 1,916,313 to 1,078,098 |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 ### Self-hosted cost and latency by load
 
@@ -79,7 +79,7 @@ The fine-tune was measured on the box, with no network in the path, at every loa
 | 32 | 14.40 | 2.16 s | 3.69 s | $0.0101 | $0.0053 | 37,837,287 | `groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10`, `groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10` |
 | 64 | 21.61 | 2.86 s | 4.67 s | $0.0068 | $0.0035 | 56,800,731 | `groq-gpt-oss-20b-k10`, `groq-gpt-oss-120b-k10`, `groq-qwen3.8-27b-k10`, `gemini-3.5-flash-lite-k10` |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 ![Self-hosted latency at every measured load: p50 and p95 for each number of concurrent requests, with the operating point marked only when a level met the rule](results/figures/latency.png)
 
@@ -97,7 +97,7 @@ The fine-tune was measured on the box, with no network in the path, at every loa
 | `groq-qwen3.8-27b-k10` | 89.6% | 79.4% | 100.0% | 0.2% | 70.7% (n=498) |
 | `gemini-3.5-flash-lite-k10` | 89.0% | 77.5% | 100.0% | 0.2% | 67.7% (n=498) |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 #### Exact match per scenario
 
@@ -124,7 +124,7 @@ Each cell is exact match, with the number of items in the scenario in brackets. 
 | transport | 76% (21) | 71% (21) | 71% (21) | 67% (21) | 71% (21) | 62% (21) |
 | weather | 92% (26) | 85% (26) | 77% (26) | 77% (26) | 88% (26) | 88% (26) |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 #### Appendix: API latency
 
@@ -137,9 +137,11 @@ Latency of the API systems, observed on free tiers from India; not representativ
 | `groq-qwen3.8-27b-k10` | 0.23 s | 0.43 s | 500 |
 | `gemini-3.5-flash-lite-k10` | 1.05 s | 1.55 s | 500 |
 
-*All API rows ran on free tiers; no money was spent; costs are at paid list prices. Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
+*All API rows ran on free tiers; no money was spent; costs are at paid list prices.*
 
 </details>
+
+*Prices: <https://console.groq.com/docs/model/openai/gpt-oss-20b> (retrieved 2026-10-02), <https://console.groq.com/docs/model/openai/gpt-oss-120b> (retrieved 2026-10-01), <https://console.groq.com/docs/model/qwen/qwen3.8-27b> (retrieved 2026-10-02), <https://ai.google.dev/gemini-api/docs/pricing> (retrieved 2026-10-02). GPU rental: <https://instances.vantage.sh/aws/ec2/g4dn.xlarge> (retrieved 2026-10-01).*
 
 Definitions and caveats are in [docs/method.md](docs/method.md). Every number is in `results/comparison.json`.
 

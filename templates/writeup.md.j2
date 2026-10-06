@@ -22,6 +22,10 @@ The fine-tune is a LoRA adapter (rank {{ training.lora.r }}, alpha {{ training.l
 {% if has_results %}
 {{ tables.accuracy_compact }}
 
+{% if sources_note and tables.cost is not defined and tables.by_load_compact is not defined %}
+{{ sources_note }}
+
+{% endif %}
 {% if figures.accuracy %}
 ![Exact match against cost per 1,000 calls](../{{ figures.accuracy }})
 
@@ -75,6 +79,10 @@ A {{ gpu.label }} instance rented around the clock for {{ hours_per_month }} hou
 {% if tables.by_load_compact is defined %}
 
 {{ tables.by_load_compact }}
+{% endif %}
+{% if sources_note %}
+
+{{ sources_note }}
 {% endif %}
 {% else %}
 API costs are computed from tokens at the providers' paid list prices, as a no-caching bound and a bound with the static prompt prefix cached. Self-hosted cost comes from throughput measured on Kaggle's free T4 at every concurrency level of the sweep, priced at the on-demand and spot rates for renting the same GPU on AWS (g4dn.xlarge), and is reported at each level with its latency. The break-even is the monthly volume at which a GPU rented around the clock ({{ hours_per_month }} hours at the on-demand price) costs less than each API, given that one GPU can serve that volume at that level. The self-hosted figures are the price with the GPU kept busy at that level; an idle or half-used GPU costs proportionally more. Self-hosted latency is measured on the box; API latency goes to the appendix.
