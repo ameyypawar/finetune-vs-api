@@ -230,6 +230,30 @@ locking again.
   text is sent to any API: the requests, and in the few-shot prompts the label lists and train examples taken
   from MASSIVE.
 
+## Error analysis
+
+`scripts/sample_errors.py` draws the errors to be labelled by hand. It ran once, on 2026-10-06, with a fixed
+seed (20261001), before any error was labelled. It draws from S500, in two strata of at most 50 items each:
+
+- The items the fine-tune gets right and the strongest API row gets wrong. The strongest API row is the one
+  with the highest exact match on S500. All such items are kept, or a seeded 50 if there are more. They show
+  what the closest API loses that the fine-tune keeps.
+- A seeded 50 of the fine-tune's own errors. They show what it still gets wrong.
+
+Each row of `results/error_analysis.csv` holds the request, the gold call and both answers. For each answer
+it also says, worked out mechanically, what differs from the gold. The person labelling gives the wrong answer
+in each row one `category`, the reason it is wrong. In the first stratum that is the API's answer; in the
+second, the fine-tune's. The categories:
+
+- `convention`: a defensible reading that MASSIVE labels another way, such as where a span starts or ends,
+  which slot type is used, or how fine-grained the intent is;
+- `label noise`: the gold label is wrong, or contradicts how train labels the same thing;
+- `ambiguous`: the request supports more than one reading;
+- `misread`: the system got the request wrong, with a wrong intent or a missed or invented slot;
+- `format`: no valid answer, or a value not copied from the request.
+
+The write-up counts the categories. The reading of them is written by hand in `docs/error_analysis.md`.
+
 ## What the scripts read and write
 
 - `scripts/compare.py` reads the test predictions and summaries under `results/runs/`, the gold labels in
@@ -245,16 +269,16 @@ locking again.
   files with matplotlib's Agg backend, so it needs no display.
 - `scripts/render.py --target readme|card|writeup|all` fills the region of `README.md` between its
   `results:start` and `results:end` markers, writes `hf/README.md` and `docs/writeup.md`, and with `--check`
-  exits 1 if any of them is out of date. CI runs the check. With no results the README is left byte-for-byte
-  as committed.
+  exits 1 if any of them is out of date. CI runs the check. With no results the region between the markers
+  is left empty and the rest of the README is unchanged.
   The README, the card and the write-up each show the table of self-hosted cost and latency by load when a
   benchmark was read (the write-up's has fewer columns, to stay short).
   Every number comes from a file and none is typed into a template. Every table is followed by the same
   notice, with the source URLs and the dates they were read on: all API rows ran on free tiers, no money was
   spent, and costs are at paid list prices.
 - Optional inputs that the card and write-up use when they exist: `results/train_log.json` (written by
-  `kaggle/train_on_kaggle.py`), `results/error_analysis.csv` (one row per hand-labelled error; a `category`
-  column is counted) and `docs/error_analysis.md` (the hand-written reading, included verbatim in the
+  `kaggle/train_on_kaggle.py`), `results/error_analysis.csv` (drawn by `scripts/sample_errors.py`, then
+  labelled by hand; its `category` column is counted, and a file with no label yet is ignored) and `docs/error_analysis.md` (the hand-written reading, included verbatim in the
   write-up so re-rendering never overwrites it).
 
 Figures are drawn from, and the generated files are checked against, what is committed: commit

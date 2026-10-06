@@ -523,7 +523,8 @@ def read_error_analysis(results_dir: Path, docs_dir: Path) -> tuple[dict[str, An
                 category = row["category"] or "(blank)"
                 counts[category] = counts.get(category, 0) + 1
             categories = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-        summary = {"path": "results/error_analysis.csv", "n": len(rows), "categories": categories}
+        if categories != [("(blank)", len(rows))]:  # a sample with no label yet (scripts/sample_errors.py) says nothing
+            summary = {"path": "results/error_analysis.csv", "n": len(rows), "categories": categories}
     prose = docs_dir / "error_analysis.md"
     return summary, prose.read_text(encoding="utf-8").strip() if prose.exists() else None
 

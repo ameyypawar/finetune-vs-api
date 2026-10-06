@@ -228,7 +228,7 @@ configs/      data, training, prices and limits, systems
 src/finetune_vs_api/   data, schema, metrics, cost, config and test lock, prompts,
                        retrieval, subsets, client, evaluate, lora_merge, hf_server
 scripts/      prepare_data, make_subsets, lock_test, run_eval, check_free_tiers, validate_chat_jsonl,
-              bench_throughput, compare, make_figures, render
+              bench_throughput, compare, sample_errors, make_figures, render
 kaggle/       the training script and its notebook metadata; serve/ holds the serving,
               dev-selection, locked-test and throughput script and its metadata (both run on a T4)
 templates/    the README results block, the model card and the write-up, filled in from results/
