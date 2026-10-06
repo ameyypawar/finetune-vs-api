@@ -451,17 +451,28 @@ def subset_notes(doc: Mapping[str, Any]) -> list[str]:
     ]
 
 
-def gap_lines(doc: Mapping[str, Any]) -> list[str]:
-    lines = []
-    for s in doc["systems"]:
-        m = s["metrics"]
-        if not m:
-            continue
-        lines.append(
-            f"{_code(s['name'])}: intent {pct(m['intent_accuracy']['value'])}, slot F1 {pct(m['slot_f1']['value'])}, "
-            f"schema-valid {pct(m['schema_valid_rate']['value'])}, values not in the request {pct(m['unfound_value_rate']['value'])}."
-        )
-    return lines
+def gap_sentence(doc: Mapping[str, Any]) -> str:
+    """The two parts of exact match, the fine-tune against the range of the other systems: slot F1 and intent
+    accuracy. Empty when the fine-tune or every other system has no result. The per-system figures, with the
+    schema-valid rate and the slot values not in the request, are the README's "Other metrics" table."""
+    scored = [s for s in doc["systems"] if s["metrics"]]
+    reference = next((s for s in scored if s["name"] == doc["reference"]), None)
+    others = [s for s in scored if s is not reference]
+    if reference is None or not others:
+        return ""
+
+    def value(system: Mapping[str, Any], key: str) -> float:
+        return system["metrics"][key]["value"]
+
+    def spread(key: str) -> str:
+        return bounds_cell(pct(min(value(s, key) for s in others)), pct(max(value(s, key) for s in others)))
+
+    against = _code(others[0]["name"]) if len(others) == 1 else "the other systems"
+    return (
+        f"Exact match needs the intent and every slot right. The fine-tune's slot F1 is {pct(value(reference, 'slot_f1'))} "
+        f"against {spread('slot_f1')} for {against}; its intent accuracy is {pct(value(reference, 'intent_accuracy'))} "
+        f"against {spread('intent_accuracy')}."
+    )
 
 
 def weakest_scenario(system: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -673,7 +684,7 @@ def build_context(root: Path, results_dir: Path, config_dir: Path, *, need_datas
         "tables": {},
         "finding_summary": "",
         "subset_notes": [],
-        "gap_lines": [],
+        "gap_sentence": "",
         "warnings": [],
         "ft_facts": None,
         "gpu": None,
@@ -734,7 +745,7 @@ def comparison_context(doc: Mapping[str, Any], dataset: Mapping[str, Any] | None
         "tables": tables,
         "finding_summary": finding_summary(doc),
         "subset_notes": subset_notes(doc),
-        "gap_lines": gap_lines(doc),
+        "gap_sentence": gap_sentence(doc),
         "warnings": shown_warnings(doc),
         "ft_facts": ft_facts,
         "pair_half_width_max": f"{max(pair_widths) * 100:.1f} pp" if pair_widths else None,

@@ -36,14 +36,7 @@ A system beats another only where the interval of the paired difference excludes
 
 ## Where the gap comes from
 
-Where each system loses points, by metric:
-
-- `ft-qwen3-4b-lora`: intent 91.0%, slot F1 84.0%, schema-valid 99.6%, values not in the request 0.2%.
-- `base-qwen3-4b-k10`: intent 87.2%, slot F1 76.8%, schema-valid 99.4%, values not in the request 0.4%.
-- `groq-gpt-oss-20b-k10`: intent 87.4%, slot F1 73.7%, schema-valid 100.0%, values not in the request 1.8%.
-- `groq-gpt-oss-120b-k10`: intent 87.4%, slot F1 73.4%, schema-valid 99.8%, values not in the request 0.6%.
-- `groq-qwen3.8-27b-k10`: intent 89.6%, slot F1 79.4%, schema-valid 100.0%, values not in the request 0.2%.
-- `gemini-3.5-flash-lite-k10`: intent 89.0%, slot F1 77.5%, schema-valid 100.0%, values not in the request 0.2%.
+Exact match needs the intent and every slot right. The fine-tune's slot F1 is 84.0% against 73.4% to 79.4% for the other systems; its intent accuracy is 91.0% against 87.2% to 89.6%.
 
 Without the 2 S500 items whose text also occurs in train, the fine-tune scores 74.9% [71.1, 78.7] on 498 items.
 

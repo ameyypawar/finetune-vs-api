@@ -39,11 +39,9 @@ No test run has been compared yet. Once the runs exist, `scripts/compare.py` wri
 ## Where the gap comes from
 
 {% if has_results %}
-Where each system loses points, by metric:
-
-{% for line in gap_lines %}
-- {{ line }}
-{% endfor %}
+{% if gap_sentence %}
+{{ gap_sentence }}
+{% endif %}
 {% if ft_facts and ft_facts.unseen %}
 
 Without the {{ ft_facts.unseen.excluded }} {{ ft_facts.subset }} items whose text also occurs in train, the fine-tune scores {{ ft_facts.unseen.em }} on {{ ft_facts.unseen.n }} items.
@@ -53,7 +51,7 @@ Without the {{ ft_facts.unseen.excluded }} {{ ft_facts.subset }} items whose tex
 The fine-tune's weakest scenario on {{ ft_facts.subset }} is {{ ft_facts.weakest.name }} ({{ ft_facts.weakest.em }}, {{ ft_facts.weakest.n }} items); cells this small are noisy.
 {% endif %}
 {% else %}
-Exact match needs the intent and every slot right. Once results exist, this section splits it into intent accuracy, slot F1, the schema-valid rate and the share of slot values that are not in the request, gives exact match without the test items whose text also occurs in train, and names the fine-tune's weakest scenario. The error analysis that follows is written by hand from sampled errors.
+Exact match needs the intent and every slot right. Once results exist, this section gives the fine-tune's slot F1 and intent accuracy against those of the other systems, gives exact match without the test items whose text also occurs in train, and names the fine-tune's weakest scenario. The error analysis that follows is written by hand from sampled errors.
 {% endif %}
 
 ### Error analysis

@@ -746,6 +746,40 @@ def test_every_heading_has_a_blank_line_before_and_after_it(standard, no_operati
             assert n + 1 == len(lines) or lines[n + 1] == "", (name, lines[n])
 
 
+def test_the_writeup_gives_the_fine_tunes_slot_f1_and_intent_against_the_range_of_the_others(standard, tmp_path):
+    lab, doc = standard
+    repo = Repo.with_results(tmp_path / "repo", lab)
+    repo.render("writeup")
+    section = repo.read("docs/writeup.md").split("## Where the gap comes from\n", 1)[1].split("\n### ", 1)[0]
+    by_name = {s["name"]: s["metrics"] for s in doc["systems"]}
+    others = [m for name, m in by_name.items() if name != FT]
+    assert len(others) == len(SYSTEMS) - 1  # not vacuous: every other system has a result
+
+    def spread(key):
+        low, high = min(m[key]["value"] for m in others), max(m[key]["value"] for m in others)
+        assert low < high  # the standard set has a real range, so both ends are shown
+        return f"{render.pct(low)} to {render.pct(high)}"
+
+    assert (
+        f"The fine-tune's slot F1 is {render.pct(by_name[FT]['slot_f1']['value'])} against {spread('slot_f1')} for the "
+        f"other systems; its intent accuracy is {render.pct(by_name[FT]['intent_accuracy']['value'])} against "
+        f"{spread('intent_accuracy')}."
+    ) in section
+    assert "\n- " not in section  # one sentence, not a line per system: the README's table has those
+
+
+def test_the_gap_sentence_names_a_lone_other_system_and_shows_one_figure_when_the_ends_meet():
+    def system(name, slot_f1, intent):
+        return {"name": name, "metrics": {"slot_f1": {"value": slot_f1}, "intent_accuracy": {"value": intent}}}
+
+    doc = {"reference": FT, "systems": [system(FT, 0.84, 0.91), system(QWEN_27B, 0.794, 0.896)]}
+    assert render.gap_sentence(doc).endswith(f"is 84.0% against 79.4% for `{QWEN_27B}`; its intent accuracy is 91.0% against 89.6%.")
+    doc["systems"].append(system(GEMINI, 0.794, 0.896))
+    assert "against 79.4% for the other systems" in render.gap_sentence(doc)
+    doc["systems"][0]["metrics"] = None  # no result for the fine-tune: nothing to say
+    assert render.gap_sentence(doc) == ""
+
+
 def test_the_writeup_gives_the_cost_break_even_and_latency_from_the_results(standard, tmp_path):
     lab, doc = standard
     repo = Repo.with_results(tmp_path / "repo", lab)
